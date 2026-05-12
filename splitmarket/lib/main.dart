@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
+import 'features/auth/views/login_page.dart';
+import 'features/auth/views/register_page.dart';
+import 'features/groups/views/home_page.dart';
+import 'features/groups/views/group_page.dart';
+import 'features/expenses/views/expense_page.dart';
+import 'features/expenses/views/add_expense_page.dart';
+import 'features/summary/views/summary_page.dart';
+import 'features/settings/views/settings_page.dart';
 
-import 'views/login/login_page.dart';
-import 'views/login/register_page.dart';
-import 'views/home/home_page.dart';
-import 'views/group/group_page.dart';
-import 'views/expense/expense_page.dart';
-import 'views/expense/add_expense_page.dart';
-import 'views/summary/summary_page.dart';
-import 'views/settings/settings_page.dart';
 
 void main() {
   runApp(const SplitMarketApp());
