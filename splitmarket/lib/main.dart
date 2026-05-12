@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'core/services/preferences_service.dart';
 
@@ -15,9 +18,25 @@ import 'features/summary/views/summary_page.dart';
 
 import 'features/settings/views/settings_page.dart';
 
-void main() {
-  runApp(const SplitMarketApp());
+
+void main() async {
+
+  WidgetsFlutterBinding.ensureInitialized();
+
+  if (Platform.isLinux ||
+      Platform.isWindows ||
+      Platform.isMacOS) {
+
+    sqfliteFfiInit();
+
+    databaseFactory = databaseFactoryFfi;
+  }
+
+  runApp(
+    const SplitMarketApp(),
+  );
 }
+
 
 class SplitMarketApp extends StatefulWidget {
   const SplitMarketApp({super.key});
