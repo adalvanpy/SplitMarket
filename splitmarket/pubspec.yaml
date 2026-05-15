@@ -17,8 +17,10 @@ dependencies:
   path: ^1.9.0
   sqflite_common_ffi: ^2.3.3
 
+  #provider: ^6.1.2
+
   # Gerenciamento de estado
-  provider: ^6.1.2
+  provider: ^6.1.5+1
 
   # Requisições HTTP / APIs
   http: ^1.2.1
