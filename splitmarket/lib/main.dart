@@ -1,9 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'core/services/preferences_service.dart';
+
+import 'core/themes/app_theme.dart';
+import 'core/themes/theme_notifier.dart';
 
 import 'features/auth/views/login_page.dart';
 import 'features/auth/views/register_page.dart';
@@ -17,7 +21,6 @@ import 'features/expenses/views/add_expense_page.dart';
 import 'features/summary/views/summary_page.dart';
 
 import 'features/settings/views/settings_page.dart';
-
 
 void main() async {
 
@@ -33,34 +36,47 @@ void main() async {
   }
 
   runApp(
-    const SplitMarketApp(),
+
+    ChangeNotifierProvider(
+
+      create: (_) => ThemeNotifier(),
+
+      child: const SplitMarketApp(),
+    ),
   );
 }
-
 
 class SplitMarketApp extends StatefulWidget {
   const SplitMarketApp({super.key});
 
   @override
-  State<SplitMarketApp> createState() => _SplitMarketAppState();
+  State<SplitMarketApp> createState() =>
+      _SplitMarketAppState();
 }
 
-class _SplitMarketAppState extends State<SplitMarketApp> {
+class _SplitMarketAppState
+    extends State<SplitMarketApp> {
 
   bool isLogged = false;
+
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
+
     checkLogin();
   }
 
   Future<void> checkLogin() async {
-    final logged = await PreferencesService.getLogin();
+
+    final logged =
+        await PreferencesService.getLogin();
 
     setState(() {
+
       isLogged = logged;
+
       isLoading = false;
     });
   }
@@ -69,39 +85,75 @@ class _SplitMarketAppState extends State<SplitMarketApp> {
   Widget build(BuildContext context) {
 
     if (isLoading) {
+
       return const MaterialApp(
+
         home: Scaffold(
+
           body: Center(
-            child: CircularProgressIndicator(),
+            child:
+                CircularProgressIndicator(),
           ),
         ),
       );
     }
 
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
+    return Consumer<ThemeNotifier>(
 
-      title: 'SplitMarket',
+      builder: (
 
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.green,
-        ),
-      ),
+        context,
 
-      home: isLogged
-          ? const HomePage()
-          : const LoginPage(),
+        themeNotifier,
 
-      routes: {
-        '/login': (context) => const LoginPage(),
-        '/register': (context) => const RegisterPage(),
-        '/home': (context) => const HomePage(),
-        '/group': (context) => const GroupPage(),
-        '/expenses': (context) => const ExpensePage(),
-        '/add-expense': (context) => const AddExpensePage(),
-        '/summary': (context) => const SummaryPage(),
-        '/settings': (context) => const SettingsPage(),
+        child,
+      ) {
+
+        return MaterialApp(
+
+          debugShowCheckedModeBanner:
+              false,
+
+          title: 'SplitMarket',
+
+          theme: AppTheme.lightTheme,
+
+          darkTheme: AppTheme.darkTheme,
+
+          themeMode:
+              themeNotifier.currentTheme,
+
+          home: isLogged
+              ? const HomePage()
+              : const LoginPage(),
+
+          routes: {
+
+            '/login': (context) =>
+                const LoginPage(),
+
+            '/register': (context) =>
+                const RegisterPage(),
+
+            '/home': (context) =>
+                const HomePage(),
+
+            '/group': (context) =>
+                const GroupPage(),
+
+            '/expenses': (context) =>
+                const ExpensePage(),
+
+            '/add-expense': (context) =>
+                const AddExpensePage(),
+
+            '/summary': (context) =>
+                const SummaryPage(),
+
+            '/settings': (context) =>
+                const SettingsPage(),
+          },
+        );
       },
     );
   }
