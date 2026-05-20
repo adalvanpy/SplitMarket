@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import '../../../widgets/custom_buttom_navbar.dart';
 
 import '../models/summary_model.dart';
-
 import '../viewmodels/summary_viewmodel.dart';
-
 import '../widgets/summary_card.dart';
 
+ main
 class SummaryPage extends StatefulWidget {
 
   const SummaryPage({super.key});
@@ -157,6 +156,7 @@ class _SummaryPageState
           Expanded(
 
             child: isLoading
+ refactor/custom-bottom-navbar
 
                 ? const Center(
                     child:
@@ -165,10 +165,58 @@ class _SummaryPageState
 
                 : Padding(
 
+
+
+                ? const Center(
+                    child:
+                        CircularProgressIndicator(),
+                  )
+
+                : Padding(
+
+ main
                     padding:
                         const EdgeInsets.all(
                       24,
                     ),
+ refactor/custom-bottom-navbar
+
+                    child: Column(
+
+                      children: [
+
+                        SummaryCard(
+
+                          title:
+                              'Total de Gastos',
+
+                          value:
+                              'R\$ ${summary!.totalExpenses.toStringAsFixed(2)}',
+
+                          icon:
+                              Icons.attach_money,
+                        ),
+
+                        SummaryCard(
+
+                          title:
+                              'Quantidade de Despesas',
+
+                          value:
+                              '${summary!.totalItems}',
+
+                          icon:
+                              Icons.receipt_long,
+                        ),
+
+                        SummaryCard(
+
+                          title:
+                              'Média por Despesa',
+
+                          value:
+                              'R\$ ${summary!.averageExpense.toStringAsFixed(2)}',
+
 
                     child: Column(
 
