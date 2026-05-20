@@ -1,7 +1,10 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
 import 'package:provider/provider.dart';
+
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'core/services/preferences_service.dart';
@@ -24,15 +27,20 @@ import 'features/settings/views/settings_page.dart';
 
 void main() async {
 
-  WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding
+      .ensureInitialized();
 
-  if (Platform.isLinux ||
-      Platform.isWindows ||
-      Platform.isMacOS) {
+  // DESKTOP ONLY
+
+  if (!kIsWeb &&
+      (Platform.isLinux ||
+          Platform.isWindows ||
+          Platform.isMacOS)) {
 
     sqfliteFfiInit();
 
-    databaseFactory = databaseFactoryFfi;
+    databaseFactory =
+        databaseFactoryFfi;
   }
 
   runApp(
@@ -46,8 +54,12 @@ void main() async {
   );
 }
 
-class SplitMarketApp extends StatefulWidget {
-  const SplitMarketApp({super.key});
+class SplitMarketApp
+    extends StatefulWidget {
+
+  const SplitMarketApp({
+    super.key,
+  });
 
   @override
   State<SplitMarketApp> createState() =>
@@ -63,6 +75,7 @@ class _SplitMarketAppState
 
   @override
   void initState() {
+
     super.initState();
 
     checkLogin();
@@ -71,7 +84,8 @@ class _SplitMarketAppState
   Future<void> checkLogin() async {
 
     final logged =
-        await PreferencesService.getLogin();
+        await PreferencesService
+            .getLogin();
 
     setState(() {
 
@@ -91,6 +105,7 @@ class _SplitMarketAppState
         home: Scaffold(
 
           body: Center(
+
             child:
                 CircularProgressIndicator(),
           ),
@@ -118,10 +133,12 @@ class _SplitMarketAppState
 
           theme: AppTheme.lightTheme,
 
-          darkTheme: AppTheme.darkTheme,
+          darkTheme:
+              AppTheme.darkTheme,
 
           themeMode:
-              themeNotifier.currentTheme,
+              themeNotifier
+                  .currentTheme,
 
           home: isLogged
               ? const HomePage()
@@ -144,13 +161,19 @@ class _SplitMarketAppState
             '/expenses': (context) =>
                 const ExpensePage(),
 
-            '/add-expense': (context) =>
+            '/add-expense': (
+              context,
+            ) =>
                 const AddExpensePage(),
 
-            '/summary': (context) =>
+            '/summary': (
+              context,
+            ) =>
                 const SummaryPage(),
 
-            '/settings': (context) =>
+            '/settings': (
+              context,
+            ) =>
                 const SettingsPage(),
           },
         );
