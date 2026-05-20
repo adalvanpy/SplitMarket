@@ -22,6 +22,7 @@ class PreferencesService {
 
     final prefs =
         await SharedPreferences.getInstance();
+        //await prefs.clear(); //REMOVER
 
     return prefs.getBool(
           loginKey,

@@ -1,8 +1,54 @@
 import 'package:flutter/material.dart';
 
-class SummaryPage extends StatelessWidget {
+import '../models/summary_model.dart';
+
+import '../viewmodels/summary_viewmodel.dart';
+
+import '../widgets/summary_card.dart';
+
+import '../viewmodels/summary_viewmodel.dart';
+
+class SummaryPage extends StatefulWidget {
 
   const SummaryPage({super.key});
+
+  @override
+  State<SummaryPage> createState() =>
+      _SummaryPageState();
+}
+
+class _SummaryPageState
+    extends State<SummaryPage> {
+
+  final SummaryViewModel
+      _summaryViewModel =
+          SummaryViewModel();
+
+  SummaryModel? summary;
+
+  bool isLoading = true;
+
+  @override
+  void initState() {
+
+    super.initState();
+
+    loadSummary();
+  }
+
+  Future<void> loadSummary() async {
+
+    final data =
+        await _summaryViewModel
+            .getSummary();
+
+    setState(() {
+
+      summary = data;
+
+      isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,77 +154,64 @@ class SummaryPage extends StatelessWidget {
             ),
           ),
 
-          // Conteúdo principal
           Expanded(
 
-            child: Center(
+            child: isLoading
 
-              child: Column(
+                ? const Center(
+                    child:
+                        CircularProgressIndicator(),
+                  )
 
-                mainAxisAlignment:
-                    MainAxisAlignment.center,
+                : Padding(
 
-                children: [
+                    padding:
+                        const EdgeInsets.all(
+                      24,
+                    ),
 
-                  Icon(
+                    child: Column(
 
-                    Icons.analytics_outlined,
+                      children: [
 
-                    size: 80,
+                        SummaryCard(
 
-                    color: Theme.of(context)
-                        .iconTheme
-                        .color,
-                  ),
+                          title:
+                              'Total de Gastos',
 
-                  const SizedBox(height: 20),
+                          value:
+                              'R\$ ${summary!.totalExpenses.toStringAsFixed(2)}',
 
-                  Text(
+                          icon:
+                              Icons.attach_money,
+                        ),
 
-                    'Resumo Financeiro',
+                        SummaryCard(
 
-                    style: TextStyle(
+                          title:
+                              'Quantidade de Despesas',
 
-                      fontSize: 22,
+                          value:
+                              '${summary!.totalItems}',
 
-                      fontWeight:
-                          FontWeight.bold,
+                          icon:
+                              Icons.receipt_long,
+                        ),
 
-                      color: Theme.of(context)
+                        SummaryCard(
 
-                          .textTheme
+                          title:
+                              'Média por Despesa',
 
-                          .bodyLarge
+                          value:
+                              'R\$ ${summary!.averageExpense.toStringAsFixed(2)}',
 
-                          ?.color,
+                          icon:
+                              Icons.analytics,
+                        ),
+                      ],
                     ),
                   ),
-
-                  const SizedBox(height: 10),
-
-                  Text(
-
-                    'Em breve você verá gráficos e estatísticas das despesas.',
-
-                    textAlign:
-                        TextAlign.center,
-
-                    style: TextStyle(
-
-                      fontSize: 16,
-
-                      color: Theme.of(context)
-
-                          .textTheme
-
-                          .bodyMedium
-
-                          ?.color,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
         ],
       ),
