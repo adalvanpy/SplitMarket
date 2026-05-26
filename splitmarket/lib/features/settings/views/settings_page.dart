@@ -1,13 +1,24 @@
 import 'package:flutter/material.dart';
+
 import 'package:provider/provider.dart';
+
+import '../../../core/services/preferences_service.dart';
 
 import '../../../core/themes/theme_notifier.dart';
 
+import '../../../widgets/custom_buttom_navbar.dart';
+
 class SettingsPage extends StatelessWidget {
+
   const SettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+
+    final themeNotifier =
+        Provider.of<ThemeNotifier>(
+      context,
+    );
 
     return Scaffold(
 
@@ -24,7 +35,8 @@ class SettingsPage extends StatelessWidget {
 
             width: double.infinity,
 
-            padding: const EdgeInsets.fromLTRB(
+            padding:
+                const EdgeInsets.fromLTRB(
               16,
               50,
               24,
@@ -40,14 +52,21 @@ class SettingsPage extends StatelessWidget {
                 end: Alignment.bottomRight,
 
                 colors: [
+
                   Color(0xFF8E76F7),
+
                   Color(0xFFB993F9),
                 ],
               ),
 
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(40),
-                bottomRight: Radius.circular(40),
+              borderRadius:
+                  BorderRadius.only(
+
+                bottomLeft:
+                    Radius.circular(40),
+
+                bottomRight:
+                    Radius.circular(40),
               ),
             ),
 
@@ -65,11 +84,14 @@ class SettingsPage extends StatelessWidget {
                     IconButton(
 
                       onPressed: () =>
-                          Navigator.pop(context),
+                          Navigator.pop(
+                        context,
+                      ),
 
                       icon: const Icon(
 
-                        Icons.arrow_back_ios_new,
+                        Icons
+                            .arrow_back_ios_new,
 
                         color: Colors.white,
 
@@ -104,13 +126,14 @@ class SettingsPage extends StatelessWidget {
 
             child: ListView(
 
-              padding: const EdgeInsets.all(24),
+              padding:
+                  const EdgeInsets.all(24),
 
               children: [
 
                 _buildSettingsCard(
 
-                  context,
+                  context: context,
 
                   icon:
                       Icons.dark_mode_outlined,
@@ -120,35 +143,21 @@ class SettingsPage extends StatelessWidget {
                   subtitle:
                       'Ativar tema escuro',
 
-                  trailing:
-                      Consumer<ThemeNotifier>(
+                  trailing: Switch(
 
-                    builder: (
+                    activeColor:
+                        const Color(
+                      0xFF8E76F7,
+                    ),
 
-                      context,
+                    value:
+                        themeNotifier
+                            .isDarkMode,
 
-                      themeNotifier,
+                    onChanged: (_) {
 
-                      child,
-                    ) {
-
-                      return Switch(
-
-                        activeColor:
-                            const Color(
-                          0xFF8E76F7,
-                        ),
-
-                        value:
-                            themeNotifier
-                                .isDarkMode,
-
-                        onChanged: (value) {
-
-                          themeNotifier
-                              .toggleTheme();
-                        },
-                      );
+                      themeNotifier
+                          .toggleTheme();
                     },
                   ),
                 ),
@@ -157,9 +166,10 @@ class SettingsPage extends StatelessWidget {
 
                 _buildSettingsCard(
 
-                  context,
+                  context: context,
 
-                  icon: Icons.person_outline,
+                  icon:
+                      Icons.person_outline,
 
                   title: 'Conta',
 
@@ -171,7 +181,7 @@ class SettingsPage extends StatelessWidget {
 
                 _buildSettingsCard(
 
-                  context,
+                  context: context,
 
                   icon:
                       Icons.notifications_outlined,
@@ -186,9 +196,10 @@ class SettingsPage extends StatelessWidget {
 
                 _buildSettingsCard(
 
-                  context,
+                  context: context,
 
-                  icon: Icons.info_outline,
+                  icon:
+                      Icons.info_outline,
 
                   title: 'Sobre',
 
@@ -198,7 +209,6 @@ class SettingsPage extends StatelessWidget {
 
                 const SizedBox(height: 32),
 
-                // Botão sair
                 SizedBox(
 
                   width: double.infinity,
@@ -230,10 +240,26 @@ class SettingsPage extends StatelessWidget {
                       elevation: 2,
                     ),
 
-                    onPressed: () {},
+                    onPressed: () async {
+
+                      await PreferencesService
+                          .logout();
+
+                      Navigator.pushNamedAndRemoveUntil(
+
+                        context,
+
+                        '/login',
+
+                        (route) => false,
+                      );
+                    },
 
                     icon: const Icon(
+
                       Icons.logout,
+
+                      color: Colors.white,
                     ),
 
                     label: const Text(
@@ -256,113 +282,16 @@ class SettingsPage extends StatelessWidget {
         ],
       ),
 
-      // Bottom Navigation
-      bottomNavigationBar: Container(
-
-        decoration: BoxDecoration(
-
-          color:
-              Theme.of(context).cardColor,
-
-          boxShadow: [
-
-            BoxShadow(
-
-              color:
-                  Colors.black.withOpacity(
-                0.05,
-              ),
-
-              blurRadius: 10,
-
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-
-        child: BottomNavigationBar(
-
-          currentIndex: 3,
-
-          type:
-              BottomNavigationBarType.fixed,
-
-          backgroundColor:
-              Theme.of(context).cardColor,
-
-          selectedItemColor:
-              const Color(0xFF8E76F7),
-
-          unselectedItemColor:
-              Colors.grey,
-
-          showUnselectedLabels: true,
-
-          onTap: (index) {
-
-            final routes = [
-
-              '/add-expense',
-              '/expenses',
-              '/summary',
-              '/settings',
-            ];
-
-            if (index == 3) return;
-
-            Navigator.pushNamed(
-              context,
-              routes[index],
-            );
-          },
-
-          items: const [
-
-            BottomNavigationBarItem(
-
-              icon: Icon(
-                Icons.add_circle_outline,
-              ),
-
-              label: 'Adicionar',
-            ),
-
-            BottomNavigationBarItem(
-
-              icon: Icon(
-                Icons.receipt_long_outlined,
-              ),
-
-              label: 'Despesas',
-            ),
-
-            BottomNavigationBarItem(
-
-              icon: Icon(
-                Icons.analytics_outlined,
-              ),
-
-              label: 'Resumo',
-            ),
-
-            BottomNavigationBarItem(
-
-              icon: Icon(
-                Icons.settings_outlined,
-              ),
-
-              label: 'Configurações',
-            ),
-          ],
-        ),
+      bottomNavigationBar:
+          const CustomBottomNavbar(
+        currentIndex: 3,
       ),
     );
   }
 
-  // Card padronizado
-  Widget _buildSettingsCard(
+  Widget _buildSettingsCard({
 
-    BuildContext context, {
+    required BuildContext context,
 
     required IconData icon,
 
@@ -380,7 +309,8 @@ class SettingsPage extends StatelessWidget {
       decoration: BoxDecoration(
 
         color:
-            Theme.of(context).cardColor,
+            Theme.of(context)
+                .cardColor,
 
         borderRadius:
             BorderRadius.circular(20),
@@ -412,9 +342,8 @@ class SettingsPage extends StatelessWidget {
 
             decoration: BoxDecoration(
 
-              color: const Color(
-                0xFFF0EDFF,
-              ),
+              color:
+                  const Color(0xFFF0EDFF),
 
               borderRadius:
                   BorderRadius.circular(
@@ -426,9 +355,8 @@ class SettingsPage extends StatelessWidget {
 
               icon,
 
-              color: const Color(
-                0xFF8E76F7,
-              ),
+              color:
+                  const Color(0xFF8E76F7),
             ),
           ),
 
@@ -456,8 +384,11 @@ class SettingsPage extends StatelessWidget {
 
                     color:
                         Theme.of(context)
+
                             .textTheme
+
                             .bodyLarge
+
                             ?.color,
                   ),
                 ),
