@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import 'package:provider/provider.dart';
+
 import '../../../widgets/custom_buttom_navbar.dart';
 
 import '../models/expense_model.dart';
-import '../services/expense_service.dart';
+
+import '../../../providers/expense_provider.dart';
 
 class ExpensePage extends StatefulWidget {
 
@@ -17,30 +20,23 @@ class ExpensePage extends StatefulWidget {
 class _ExpensePageState
     extends State<ExpensePage> {
 
-  final ExpenseService expenseService =
-      ExpenseService();
-
-  List<ExpenseModel> expenses = [];
-
   @override
   void initState() {
 
     super.initState();
 
-    loadExpenses();
-  }
+    Future.microtask(() {
 
-  Future<void> loadExpenses() async {
-
-    final data =
-        await expenseService.getExpenses();
-
-    setState(() {
-      expenses = data;
+      Provider.of<ExpenseProvider>(
+        context,
+        listen: false,
+      ).carregarDespesas();
     });
   }
 
-  double get totalExpenses {
+  double totalExpenses(
+    List<ExpenseModel> expenses,
+  ) {
 
     double total = 0;
 
@@ -143,14 +139,17 @@ class _ExpensePageState
 
                     IconButton(
 
-                      onPressed: () {
+                      onPressed: () async {
 
-                        Navigator.pushNamed(
+                        await Navigator.pushNamed(
                           context,
                           '/add-expense',
-                        ).then(
-                          (_) => loadExpenses(),
                         );
+
+                        Provider.of<ExpenseProvider>(
+                          context,
+                          listen: false,
+                        ).carregarDespesas();
                       },
 
                       icon: const Icon(
@@ -197,19 +196,29 @@ class _ExpensePageState
                         ),
                       ),
 
-                      Text(
+                      Consumer<ExpenseProvider>(
 
-                        'R\$ ${totalExpenses.toStringAsFixed(2)}',
+                        builder: (
+                          context,
+                          provider,
+                          child,
+                        ) {
 
-                        style: const TextStyle(
+                          return Text(
 
-                          color: Colors.white,
+                            'R\$ ${totalExpenses(provider.despesas).toStringAsFixed(2)}',
 
-                          fontSize: 36,
+                            style: const TextStyle(
 
-                          fontWeight:
-                              FontWeight.bold,
-                        ),
+                              color: Colors.white,
+
+                              fontSize: 36,
+
+                              fontWeight:
+                                  FontWeight.bold,
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -221,33 +230,54 @@ class _ExpensePageState
           // Lista
           Expanded(
 
-            child: expenses.isEmpty
+            child: Consumer<ExpenseProvider>(
 
-                ? _buildEmptyState()
+              builder: (
+                context,
+                provider,
+                child,
+              ) {
 
-                : ListView.builder(
+                if (provider.carregando) {
 
-                    padding:
-                        const EdgeInsets.only(
-                      top: 20,
-                      bottom: 20,
-                    ),
+                  return const Center(
 
-                    itemCount:
-                        expenses.length,
+                    child:
+                        CircularProgressIndicator(),
+                  );
+                }
 
-                    itemBuilder:
-                        (context, index) {
+                if (provider.despesas.isEmpty) {
 
-                      final expense =
-                          expenses[index];
+                  return _buildEmptyState();
+                }
 
-                      return _buildExpenseCard(
-                        context,
-                        expense,
-                      );
-                    },
+                return ListView.builder(
+
+                  padding:
+                      const EdgeInsets.only(
+                    top: 20,
+                    bottom: 20,
                   ),
+
+                  itemCount:
+                      provider.despesas.length,
+
+                  itemBuilder:
+                      (context, index) {
+
+                    final expense =
+                        provider
+                            .despesas[index];
+
+                    return _buildExpenseCard(
+                      context,
+                      expense,
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -425,12 +455,13 @@ class _ExpensePageState
 
               onPressed: () async {
 
-                await expenseService
-                    .deleteExpense(
+                await Provider.of<
+                    ExpenseProvider>(
+                  context,
+                  listen: false,
+                ).deletarDespesa(
                   expense.id!,
                 );
-
-                loadExpenses();
               },
             ),
           ],

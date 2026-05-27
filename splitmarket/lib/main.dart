@@ -25,6 +25,8 @@ import 'features/summary/views/summary_page.dart';
 
 import 'features/settings/views/settings_page.dart';
 
+import 'providers/expense_provider.dart';
+
 void main() async {
 
   WidgetsFlutterBinding
@@ -44,13 +46,18 @@ void main() async {
   }
 
   runApp(
-
-    ChangeNotifierProvider(
-
-      create: (_) => ThemeNotifier(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => ThemeNotifier(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ExpenseProvider(),
+        ),
+      ],
 
       child: const SplitMarketApp(),
-    ),
+    )   
   );
 }
 

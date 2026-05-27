@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'package:provider/provider.dart';
+
 import '../models/expense_model.dart';
-import '../services/expense_service.dart';
+
+import '../../../providers/expense_provider.dart';
 
 class AddExpensePage extends StatefulWidget {
 
@@ -26,9 +29,6 @@ class _AddExpensePageState
   final TextEditingController
       payerController =
           TextEditingController();
-
-  final ExpenseService expenseService =
-      ExpenseService();
 
   @override
   Widget build(BuildContext context) {
@@ -295,8 +295,11 @@ class _AddExpensePageState
                                   .text,
                         );
 
-                        await expenseService
-                            .insertExpense(
+                        await Provider.of<
+                            ExpenseProvider>(
+                          context,
+                          listen: false,
+                        ).adicionarDespesa(
                           expense,
                         );
 
