@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../widgets/custom_buttom_navbar.dart';
+import '../../../shared/widgets/custom_buttom_navbar.dart';
 
-import '../models/summary_model.dart';
+import '../../../data/models/summary_model.dart';
 import '../viewmodels/summary_viewmodel.dart';
 import '../widgets/summary_card.dart';
 

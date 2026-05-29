@@ -1,54 +1,42 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import 'package:splitmarket/services/auth_service.dart';
-import 'package:splitmarket/controller/login_controller.dart';
+import 'package:splitmarket/core/services/auth_service.dart';
+import 'package:splitmarket/features/auth/controllers/login_controller.dart';
 
-class MockAuthService extends Mock
-    implements AuthService {}
+class MockAuthService extends Mock implements AuthService {}
+class MockUser extends Mock implements User {}
 
 void main() {
-
   late MockAuthService mockAuthService;
-
   late LoginController controller;
 
   setUp(() {
-
-    mockAuthService =
-        MockAuthService();
-
-    controller =
-        LoginController(
-          mockAuthService,
-        );
+    mockAuthService = MockAuthService();
+    controller = LoginController(mockAuthService);
   });
 
-  test(
-    'deve retornar true quando login for válido',
-    () {
+  test('deve retornar true quando login for válido', () async {
+    when(
+      () => mockAuthService.signIn(
+        'admin',
+        '123',
+      ),
+    ).thenAnswer((_) async => MockUser());
 
-      when(
-        () => mockAuthService.login(
-          'admin',
-          '123',
-        ),
-      ).thenReturn(true);
+    final resultado = await controller.fazerLogin(
+      'admin',
+      '123',
+    );
 
-      final resultado =
-          controller.fazerLogin(
-            'admin',
-            '123',
-          );
+    expect(resultado, true);
 
-      expect(resultado, true);
-
-      verify(
-        () => mockAuthService.login(
-          'admin',
-          '123',
-        ),
-      ).called(1);
-    },
-  );
+    verify(
+      () => mockAuthService.signIn(
+        'admin',
+        '123',
+      ),
+    ).called(1);
+  });
 }
