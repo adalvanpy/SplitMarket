@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'package:provider/provider.dart';
 
-import '../../../widgets/custom_buttom_navbar.dart';
+import '../../../shared/widgets/custom_buttom_navbar.dart';
 
-import '../models/expense_model.dart';
+import '../../../data/models/expense_model.dart';
 
-import '../../../providers/expense_provider.dart';
+import '../../../data/repositories/expense_repository.dart';
 
 class ExpensePage extends StatefulWidget {
 

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../features/expenses/models/expense_model.dart';
+import '../models/expense_model.dart';
 
-import '../features/expenses/services/expense_service.dart';
+import '../../core/services/expense_service.dart';
 
 class ExpenseProvider
     extends ChangeNotifier {
