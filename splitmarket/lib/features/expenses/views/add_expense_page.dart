@@ -7,6 +7,13 @@ import '../../../data/models/expense_model.dart';
 import '../../../data/repositories/expense_repository.dart';
 import '../../../shared/widgets/custom_buttom_navbar.dart';
 
+
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+
+import '../../../core/services/location_service.dart';
+
+
 class AddExpensePage extends StatefulWidget {
   final String? grupoId;
 
@@ -21,6 +28,12 @@ class _AddExpensePageState extends State<AddExpensePage> {
   final TextEditingController valueController = TextEditingController();
   final TextEditingController payerController = TextEditingController();
   
+  final LocationService _locationService = LocationService();
+
+  LatLng? _currentPosition;
+
+  String _address = 'Buscando localização...';
+  
   String _userName = '';
   bool _isLoading = true;
 
@@ -28,7 +41,36 @@ class _AddExpensePageState extends State<AddExpensePage> {
   void initState() {
     super.initState();
     _loadUserName();
+    _loadLocation();
+
   }
+  Future<void> _loadLocation() async {
+  try {
+    final position =
+        await _locationService.getCurrentLocation();
+
+    if (position != null) {
+      final endereco =
+          await _locationService.getAddressFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      setState(() {
+        _currentPosition = LatLng(
+          position.latitude,
+          position.longitude,
+        );
+
+        _address = endereco;
+      });
+    }
+  } catch (e) {
+    setState(() {
+      _address = 'Erro ao obter localização';
+    });
+  }
+}
 
   @override
   void dispose() {
@@ -210,7 +252,69 @@ class _AddExpensePageState extends State<AddExpensePage> {
                           ),
                         ),
                         
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 24),
+
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Localização da despesa',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      Container(
+                        height: 250,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: _currentPosition == null
+                          ? const Center(
+                              child: CircularProgressIndicator(),
+                    )
+                  : FlutterMap(
+                      options: MapOptions(
+                        initialCenter: _currentPosition!,
+                        initialZoom: 15,
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: _currentPosition!,
+                            width: 40,
+                            height: 40,
+                            child: const Icon(
+                              Icons.location_on,
+                              color: Colors.red,
+                              size: 40,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+),
+
+const SizedBox(height: 12),
+
+Text(
+  _address,
+  style: const TextStyle(
+    fontSize: 13,
+  ),
+),
+
+const SizedBox(height: 40),
 
                         // Botão salvar
                         SizedBox(
