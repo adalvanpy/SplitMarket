@@ -1,10 +1,77 @@
 import 'package:flutter/material.dart';
 
+import 'package:geolocator/geolocator.dart';
+
+import 'package:flutter_map/flutter_map.dart';
+
+import 'package:latlong2/latlong.dart';
+
 import '../../../widgets/custom_buttom_navbar.dart';
 
-class HomePage extends StatelessWidget {
+import '../../../services/location_service.dart';
+
+class HomePage extends StatefulWidget {
 
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() =>
+      _HomePageState();
+}
+
+class _HomePageState
+    extends State<HomePage> {
+
+  final LocationService
+      locationService =
+          LocationService();
+
+  Position? currentPosition;
+
+  String address = '';
+
+  final MapController mapController =
+      MapController();
+
+  bool loading = false;
+
+  Future<void> getLocation() async {
+
+    setState(() {
+
+      loading = true;
+    });
+
+    final position =
+        await locationService
+            .getCurrentLocation();
+
+    if (position != null) {
+
+      final endereco =
+          await locationService
+              .getAddressFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      setState(() {
+
+        currentPosition = position;
+
+        address = endereco;
+
+        loading = false;
+      });
+
+    } else {
+
+      setState(() {
+
+        loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,7 +162,8 @@ class HomePage extends StatelessWidget {
                     style: TextStyle(
 
                       color:
-                          Colors.white.withOpacity(
+                          Colors.white
+                              .withOpacity(
                         0.7,
                       ),
 
@@ -112,25 +180,223 @@ class HomePage extends StatelessWidget {
               padding:
                   const EdgeInsets.all(24),
 
-              child: Text(
+              child: Column(
 
-                'Visão Geral',
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
 
-                style: TextStyle(
+                children: [
 
-                  fontSize: 22,
+                  Text(
 
-                  fontWeight:
-                      FontWeight.bold,
+                    'Visão Geral',
 
-                  color: Theme.of(context)
+                    style: TextStyle(
 
-                      .textTheme
+                      fontSize: 22,
 
-                      .bodyLarge
+                      fontWeight:
+                          FontWeight.bold,
 
-                      ?.color,
-                ),
+                      color:
+                          Theme.of(context)
+
+                              .textTheme
+
+                              .bodyLarge
+
+                              ?.color,
+                    ),
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  SizedBox(
+
+                    width: double.infinity,
+
+                    height: 55,
+
+                    child: ElevatedButton(
+
+                      onPressed: loading
+                          ? null
+                          : getLocation,
+
+                      style:
+                          ElevatedButton
+                              .styleFrom(
+
+                        backgroundColor:
+                            const Color(
+                          0xFF8E76F7,
+                        ),
+
+                        foregroundColor:
+                            Colors.white,
+                      ),
+
+                      child: loading
+
+                          ? const CircularProgressIndicator(
+                              color:
+                                  Colors.white,
+                            )
+
+                          : const Text(
+
+                              'Obter Localização',
+
+                              style:
+                                  TextStyle(
+                                fontSize: 18,
+                              ),
+                            ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  if (currentPosition != null)
+                    Column(
+
+                      crossAxisAlignment:
+                          CrossAxisAlignment
+                              .start,
+
+                      children: [
+
+                        Text(
+
+                          address,
+
+                          style:
+                              const TextStyle(
+
+                            fontSize: 16,
+
+                            fontWeight:
+                                FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(
+                          height: 15,
+                        ),
+
+                        Text(
+
+                          'Latitude: ${currentPosition!.latitude}',
+
+                          style:
+                              const TextStyle(
+                            fontSize: 16,
+                          ),
+                        ),
+
+                        const SizedBox(
+                          height: 10,
+                        ),
+
+                        Text(
+
+                          'Longitude: ${currentPosition!.longitude}',
+
+                          style:
+                              const TextStyle(
+                            fontSize: 16,
+                          ),
+                        ),
+
+                        const SizedBox(
+                          height: 25,
+                        ),
+
+                        SizedBox(
+
+                          height: 300,
+
+                          child: ClipRRect(
+
+                            borderRadius:
+                                BorderRadius
+                                    .circular(
+                              20,
+                            ),
+
+                            child: FlutterMap(
+
+                              mapController:
+                                  mapController,
+
+                              options:
+                                  MapOptions(
+
+                                initialCenter:
+                                    LatLng(
+
+                                  currentPosition!
+                                      .latitude,
+
+                                  currentPosition!
+                                      .longitude,
+                                ),
+
+                                initialZoom: 15,
+                              ),
+
+                              children: [
+
+                                TileLayer(
+
+                                  urlTemplate:
+                                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+
+                                  userAgentPackageName:
+                                      'com.example.splitmarket',
+                                ),
+
+                                MarkerLayer(
+
+                                  markers: [
+
+                                    Marker(
+
+                                      point:
+                                          LatLng(
+
+                                        currentPosition!
+                                            .latitude,
+
+                                        currentPosition!
+                                            .longitude,
+                                      ),
+
+                                      width: 80,
+
+                                      height: 80,
+
+                                      child:
+                                          const Icon(
+
+                                        Icons
+                                            .location_on,
+
+                                        color:
+                                            Colors.red,
+
+                                        size: 40,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
               ),
             ),
           ],
