@@ -174,4 +174,9 @@ class GroupProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  void limparGrupos() {
+    grupos = [];
+    notifyListeners();
+  }
 }

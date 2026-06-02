@@ -2,10 +2,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/preferences_service.dart';
 import '../../../data/models/user_model.dart';
+import '../../../data/repositories/expense_repository.dart';
+import '../../../data/repositories/group_repository.dart';
 import '../../../shared/widgets/custom_buttom_navbar.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -193,7 +196,10 @@ class _ProfilePageState extends State<ProfilePage> {
     if (confirm == true) {
       await _authService.signOut();
       await PreferencesService.clearUserData();
-      
+      // Do not clear local expense DB here to preserve user's data across logins
+      // Keep only in-memory groups cleared so UI doesn't show stale data
+      context.read<GroupProvider>().limparGrupos();
+
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
       }

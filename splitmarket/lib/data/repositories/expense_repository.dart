@@ -29,6 +29,37 @@ class ExpenseProvider
     notifyListeners();
   }
 
+  Future<void> carregarDespesasPorGrupo(String grupoId) async {
+    carregando = true;
+
+    notifyListeners();
+
+    despesas = await _service.getExpensesByGroup(grupoId);
+
+    carregando = false;
+
+    notifyListeners();
+  }
+
+  Future<void> limparDespesas() async {
+    carregando = true;
+    despesas = [];
+    notifyListeners();
+    carregando = false;
+    notifyListeners();
+  }
+
+  Future<void> clearLocalExpenses() async {
+    carregando = true;
+    notifyListeners();
+
+    await _service.clearExpenses();
+    despesas = [];
+
+    carregando = false;
+    notifyListeners();
+  }
+
   Future<void> adicionarDespesa(
     ExpenseModel expense,
   ) async {
