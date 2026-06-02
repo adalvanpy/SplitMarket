@@ -1,65 +1,67 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/auth_service.dart';
 import '../../../core/services/preferences_service.dart';
-import '../../../widgets/responsive_layout.dart';
+import '../../../shared/widgets/responsive_layout.dart';
 
 class LoginPage extends StatefulWidget {
-
   const LoginPage({super.key});
 
   @override
-  State<LoginPage> createState() =>
-      _LoginPageState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState
-    extends State<LoginPage> {
-
-  final TextEditingController
-      emailController =
-          TextEditingController();
-
-  final TextEditingController
-      passwordController =
-          TextEditingController();
+class _LoginPageState extends State<LoginPage> {
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final AuthService _authService = AuthService();
 
   @override
   void dispose() {
-
     emailController.dispose();
-
     passwordController.dispose();
-
     super.dispose();
   }
 
   Future<void> login() async {
-
-    if (emailController.text.isEmpty ||
-        passwordController.text.isEmpty) {
-
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-
+    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Preencha todos os campos',
-          ),
+          content: Text('Preencha todos os campos'),
         ),
       );
-
       return;
     }
 
-    await PreferencesService
-        .saveLogin(true);
+    try {
+      final user = await _authService.signIn(
+        emailController.text.trim(),
+        passwordController.text.trim(),
+      );
 
-    if (!mounted) return;
+      if (user == null) {
+        throw Exception('Não foi possível entrar com esses dados.');
+      }
 
-    Navigator.pushReplacementNamed(
-      context,
-      '/home',
-    );
+      await PreferencesService.saveUserName(
+        // LocalUser has `email` property
+        (user as dynamic).email ?? emailController.text.trim(),
+      );
+      await PreferencesService.saveLogin(true);
+
+      if (!mounted) return;
+
+      Navigator.pushReplacementNamed(
+        context,
+        '/home',
+      );
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString()),
+        ),
+      );
+    }
   }
 
   @override

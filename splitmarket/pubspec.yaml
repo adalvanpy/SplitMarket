@@ -10,22 +10,20 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  
+  # Firebase - VERSÕES CORRETAS
+  firebase_core: ^3.8.0
+  firebase_auth: ^5.3.3
+  cloud_firestore: ^5.4.0
+  
+  # Outras dependências
   shared_preferences: ^2.2.3
   cupertino_icons: ^1.0.8
-
   sqflite: ^2.3.3
   path: ^1.9.0
   sqflite_common_ffi: ^2.3.3
-
-  #provider: ^6.1.2
-
-  # Gerenciamento de estado
   provider: ^6.1.5+1
-
-  # Requisições HTTP / APIs
   http: ^1.2.1
-
-  # Mapas e localização
   geolocator: ^12.0.0
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
@@ -37,11 +35,10 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
   flutter_lints: ^6.0.0
+  mocktail: ^1.0.5
 
 flutter:
   uses-material-design: true
-
   assets:
     - assets/images/

@@ -29,8 +29,9 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -44,8 +45,21 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         description TEXT NOT NULL,
         value REAL NOT NULL,
-        payer TEXT NOT NULL
+        payer TEXT NOT NULL,
+        grupoId TEXT,
+        createdAt TEXT
       )
     ''');
+  }
+
+  Future _upgradeDB(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE expenses ADD COLUMN grupoId TEXT');
+      await db.execute('ALTER TABLE expenses ADD COLUMN createdAt TEXT');
+    }
   }
 }

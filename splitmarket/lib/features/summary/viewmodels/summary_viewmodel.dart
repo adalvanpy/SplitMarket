@@ -1,8 +1,8 @@
-import '../../expenses/models/expense_model.dart';
+import '../../../data/models/expense_model.dart';
 
-import '../../expenses/services/expense_service.dart';
+import '../../../core/services/expense_service.dart';
 
-import '../models/summary_model.dart';
+import '../../../data/models/summary_model.dart';
 
 class SummaryViewModel {
 
