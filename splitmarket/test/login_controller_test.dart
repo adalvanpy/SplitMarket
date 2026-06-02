@@ -6,7 +6,6 @@ import 'package:splitmarket/core/services/auth_service.dart';
 import 'package:splitmarket/features/auth/controllers/login_controller.dart';
 
 class MockAuthService extends Mock implements AuthService {}
-class MockUser extends Mock implements User {}
 
 void main() {
   late MockAuthService mockAuthService;
@@ -23,7 +22,7 @@ void main() {
         'admin',
         '123',
       ),
-    ).thenAnswer((_) async => MockUser());
+    ).thenAnswer((_) async => LocalUser('admin@example.com'));
 
     final resultado = await controller.fazerLogin(
       'admin',

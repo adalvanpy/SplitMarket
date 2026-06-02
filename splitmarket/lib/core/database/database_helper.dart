@@ -62,4 +62,9 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE expenses ADD COLUMN createdAt TEXT');
     }
   }
+
+  Future<void> deleteAllExpenses() async {
+    final db = await database;
+    await db.delete('expenses');
+  }
 }

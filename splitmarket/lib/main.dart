@@ -18,6 +18,8 @@ import 'features/groups/views/group_page.dart';
 import 'features/expenses/views/expense_page.dart';
 import 'features/expenses/views/add_expense_page.dart';
 import 'features/summary/views/summary_page.dart';
+import 'features/notifications/viewmodels/notification_provider.dart';
+import 'features/notifications/views/notifications_page.dart';
 import 'features/settings/views/settings_page.dart';
 import 'features/profile/views/profile_page.dart';
 
@@ -47,6 +49,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ExpenseProvider()),
         ChangeNotifierProvider(create: (_) => GroupProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: const SplitMarketApp(),
     ),
@@ -116,6 +119,7 @@ class _SplitMarketAppState extends State<SplitMarketApp> {
             '/add-expense': (context) => const AddExpensePage(),
             '/summary': (context) => const SummaryPage(),
             '/settings': (context) => const SettingsPage(),
+            '/notifications': (context) => const NotificationsPage(),
             '/profile': (context) => const ProfilePage(),
           },
         );

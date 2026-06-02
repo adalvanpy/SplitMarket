@@ -1,0 +1,9 @@
+# Normalize all text files
+* text=auto
+
+# Force LF line endings for source files
+*.dart text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.json text eol=lf

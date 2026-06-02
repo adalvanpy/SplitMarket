@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/services/auth_service.dart';
+import '../../../core/services/expense_service.dart';
 import '../../../core/services/preferences_service.dart';
 import '../../../core/themes/theme_notifier.dart';
+import '../../../data/repositories/group_repository.dart';
+import '../../notifications/viewmodels/notification_provider.dart';
 import '../../../shared/widgets/custom_buttom_navbar.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -92,11 +95,55 @@ class SettingsPage extends StatelessWidget {
                   },
                 ),
                 const SizedBox(height: 16),
-                _buildSettingsCard(
-                  context: context,
-                  icon: Icons.notifications_outlined,
-                  title: 'Notificações',
-                  subtitle: 'Gerenciar alertas do app',
+                FutureBuilder<String>(
+                  future: PreferencesService.getUserName(),
+                  builder: (context, snapshot) {
+                    final currentUser = snapshot.data ?? 'Usuário';
+                    return Consumer<NotificationProvider>(
+                      builder: (context, notificationProvider, child) {
+                        final pendingCount = notificationProvider.pendingCountFor(currentUser);
+                        return _buildSettingsCard(
+                          context: context,
+                          icon: Icons.notifications_outlined,
+                          title: 'Notificações',
+                          subtitle: 'Pendências de confirmação',
+                          onTap: () {
+                            Navigator.pushNamed(context, '/notifications');
+                          },
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (pendingCount > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    '$pendingCount',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(width: 12),
+                              const Icon(
+                                Icons.arrow_forward_ios,
+                                size: 14,
+                                color: Colors.grey,
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 _buildSettingsCard(
@@ -123,8 +170,9 @@ class SettingsPage extends StatelessWidget {
                         // Fazer logout do Firebase
                         await AuthService().signOut();
                         
-                        // Limpar dados locais
+                        // Limpar dados locais (preserve local DB so expenses remain)
                         await PreferencesService.clearUserData();
+                        context.read<GroupProvider>().limparGrupos();
                         
                         if (context.mounted) {
                           // Navegar para tela de login

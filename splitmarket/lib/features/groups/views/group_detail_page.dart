@@ -157,11 +157,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                     _buildActionButtons(context),
                     const SizedBox(height: 24),
                     
-                    // Resumo de gastos
-                    if (despesas.isNotEmpty) 
-                      _buildResumoDebitos(context, despesas, isDark),
-                    if (despesas.isNotEmpty) const SizedBox(height: 24),
-                    
+                    // Resumo de gastos removed — show only history
                     // Lista de despesas
                     _buildDespesasSection(context, despesas, isDark),
                   ],
@@ -386,71 +382,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     );
   }
 
-  // Resumo de débitos - VALOR COM FONTE MENOR
-  Widget _buildResumoDebitos(BuildContext context, List<ExpenseModel> despesas, bool isDark) {
-    final dividas = _calcularDividasParticipante(despesas);
-    final totalGasto = _calcularTotalPago(despesas);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2D2D2D) : const Color(0xFF8E76F7).withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? Colors.white12 : const Color(0xFF8E76F7).withOpacity(0.2),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Resumo de Gastos',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Total Gasto: R\$ ${totalGasto.toStringAsFixed(2)}',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              color: isDark ? Colors.white70 : Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ...dividas.entries.map((entry) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    entry.key,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isDark ? Colors.white70 : Colors.grey.shade700,
-                    ),
-                  ),
-                  Text(
-                    'R\$ ${entry.value.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                      color: const Color(0xFF8E76F7),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-        ],
-      ),
-    );
-  }
+  // Resumo de Gastos removed per design: show only expense history
 
   // Lista de despesas - VALOR COM FONTE MENOR
   Widget _buildDespesasSection(
@@ -556,7 +488,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                     const Divider(height: 1),
                     const SizedBox(height: 10),
                     Text(
-                      'Quem deve:',
+                      'Divisão',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -564,34 +496,59 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    ...widget.grupo.membros
-                        .where((membro) => membro != expense.payer)
-                        .map(
-                          (membro) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 3),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  _getUserName(membro),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isDark ? Colors.white60 : Colors.grey.shade600,
-                                  ),
+                    ...widget.grupo.membros.map((membro) {
+                      final nome = _getUserName(membro);
+                      if (membro == expense.payer) {
+                        final payerNet = (expense.value - valorPorPessoa);
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                nome,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.white60 : Colors.grey.shade600,
                                 ),
-                                Text(
-                                  'R\$ ${valorPorPessoa.toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 12,
-                                    color: Colors.orange.shade600,
-                                  ),
+                              ),
+                              Text(
+                                'R\$ ${payerNet.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  color: Colors.green.shade600,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        )
-                        .toList(),
+                        );
+                      } else {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                nome,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.white60 : Colors.grey.shade600,
+                                ),
+                              ),
+                              Text(
+                                'R\$ ${valorPorPessoa.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  color: Colors.red.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                    }).toList(),
                   ],
                 ),
               );

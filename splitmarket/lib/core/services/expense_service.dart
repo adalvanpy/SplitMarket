@@ -1,5 +1,6 @@
 import '../database/database_helper.dart';
 import '../../data/models/expense_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ExpenseService {
   final DatabaseHelper _databaseHelper =
@@ -11,10 +12,30 @@ class ExpenseService {
   async{
     final db = await _databaseHelper.database;
 
-    return await db.insert(
+    final id = await db.insert(
       'expenses',
       expense.toMap(),
     );
+
+    // Try to also save to Firestore. Failure here should not break local storage.
+    try {
+      final firestore = FirebaseFirestore.instance;
+
+      final firestoreMap = {
+        'localId': id,
+        'description': expense.description,
+        'value': expense.value,
+        'payer': expense.payer,
+        'grupoId': expense.grupoId,
+        'createdAt': expense.createdAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
+      };
+
+      await firestore.collection('expenses').add(firestoreMap);
+    } catch (e) {
+      // Optional: log the error with your preferred logging. Do not rethrow.
+    }
+
+    return id;
   }
   Future<List<ExpenseModel>> getExpenses() async{
     final db = await _databaseHelper.database;
@@ -58,5 +79,10 @@ class ExpenseService {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<void> clearExpenses() async {
+    final db = await _databaseHelper.database;
+    await db.delete('expenses');
   }
 }
