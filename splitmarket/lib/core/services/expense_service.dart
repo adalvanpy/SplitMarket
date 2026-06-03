@@ -1,6 +1,7 @@
 import '../database/database_helper.dart';
 import '../../data/models/expense_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ExpenseService {
   final DatabaseHelper _databaseHelper =
@@ -10,6 +11,25 @@ class ExpenseService {
     ExpenseModel expense,
   )
   async{
+    // On web we don't have local sqflite DB available; use Firestore as primary storage.
+    if (kIsWeb) {
+      try {
+        final firestore = FirebaseFirestore.instance;
+        final firestoreMap = {
+          'description': expense.description,
+          'value': expense.value,
+          'payer': expense.payer,
+          'grupoId': expense.grupoId,
+          'createdAt': expense.createdAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
+        };
+        await firestore.collection('expenses').add(firestoreMap);
+      } catch (e) {
+        // Optional: log error
+      }
+      // No local integer id on web
+      return 0;
+    }
+
     final db = await _databaseHelper.database;
 
     final id = await db.insert(
@@ -38,6 +58,33 @@ class ExpenseService {
     return id;
   }
   Future<List<ExpenseModel>> getExpenses() async{
+    if (kIsWeb) {
+      try {
+        final firestore = FirebaseFirestore.instance;
+        final snapshot = await firestore.collection('expenses').get();
+        final list = snapshot.docs.map((doc) {
+          final data = doc.data();
+          // Normalize fields for fromJson
+          return ExpenseModel.fromJson({
+            'id': null,
+            'description': data['description'] ?? '',
+            'value': (data['value'] ?? 0).toDouble(),
+            'payer': data['payer'] ?? '',
+            'grupoId': data['grupoId'],
+            'createdAt': data['createdAt'],
+          });
+        }).toList();
+
+        // Optionally sort by createdAt desc
+        list.sort((a, b) => (b.createdAt ?? DateTime.now())
+            .compareTo(a.createdAt ?? DateTime.now()));
+
+        return list;
+      } catch (e) {
+        return [];
+      }
+    }
+
     final db = await _databaseHelper.database;
     final List<Map<String, dynamic>> maps =
     await db.query('expenses');
@@ -53,6 +100,35 @@ class ExpenseService {
   }
 
   Future<List<ExpenseModel>> getExpensesByGroup(String grupoId) async {
+    if (kIsWeb) {
+      try {
+        final firestore = FirebaseFirestore.instance;
+        final snapshot = await firestore
+            .collection('expenses')
+            .where('grupoId', isEqualTo: grupoId)
+            .get();
+
+        final list = snapshot.docs.map((doc) {
+          final data = doc.data();
+          return ExpenseModel.fromJson({
+            'id': null,
+            'description': data['description'] ?? '',
+            'value': (data['value'] ?? 0).toDouble(),
+            'payer': data['payer'] ?? '',
+            'grupoId': data['grupoId'],
+            'createdAt': data['createdAt'],
+          });
+        }).toList();
+
+        list.sort((a, b) => (b.createdAt ?? DateTime.now())
+            .compareTo(a.createdAt ?? DateTime.now()));
+
+        return list;
+      } catch (e) {
+        return [];
+      }
+    }
+
     final db = await _databaseHelper.database;
     final List<Map<String, dynamic>> maps = await db.query(
       'expenses',

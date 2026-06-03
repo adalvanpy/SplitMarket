@@ -19,11 +19,13 @@
   <title>SplitMarket</title>
   <link rel="manifest" href="manifest.json">
   
-  <!-- 🔥 FIREBASE SCRIPTS - OBRIGATÓRIO PARA AUTENTICAÇÃO 🔥 -->
+  <!-- 🔥 FIREBASE SCRIPTS - TODOS OS MÓDULOS NECESSÁRIOS 🔥 -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js"></script>
   
-  <!-- Configuração manual do Firebase para garantir -->
+  <!-- Configuração do Firebase -->
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyBoAHVmpLVjF0DGAjRygpax-4NWo8BaeYk",
@@ -39,6 +41,9 @@
     if (typeof firebase !== 'undefined' && firebase.apps.length === 0) {
       firebase.initializeApp(firebaseConfig);
       console.log('✅ Firebase inicializado com sucesso!');
+      console.log('📊 Módulos carregados: Auth, Firestore, Storage');
+    } else {
+      console.warn('⚠️ Firebase SDK não foi carregado corretamente');
     }
   </script>
 </head>
