@@ -354,6 +354,7 @@ const SizedBox(height: 40),
                                   payer: payerController.text,
                                   grupoId: widget.grupoId,
                                   createdAt: DateTime.now(),
+                                  location: _address,
                                 );
 
                                 await context.read<ExpenseProvider>().adicionarDespesa(expense);

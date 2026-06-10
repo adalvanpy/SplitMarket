@@ -21,6 +21,7 @@ class ExpenseService {
           'payer': expense.payer,
           'grupoId': expense.grupoId,
           'createdAt': expense.createdAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
+          'location': expense.location,
         };
         await firestore.collection('expenses').add(firestoreMap);
       } catch (e) {
@@ -48,6 +49,7 @@ class ExpenseService {
         'payer': expense.payer,
         'grupoId': expense.grupoId,
         'createdAt': expense.createdAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
+        'location': expense.location,
       };
 
       await firestore.collection('expenses').add(firestoreMap);
@@ -72,6 +74,7 @@ class ExpenseService {
             'payer': data['payer'] ?? '',
             'grupoId': data['grupoId'],
             'createdAt': data['createdAt'],
+            'location': data['location'],
           });
         }).toList();
 
@@ -117,6 +120,7 @@ class ExpenseService {
             'payer': data['payer'] ?? '',
             'grupoId': data['grupoId'],
             'createdAt': data['createdAt'],
+            'location': data['location'],
           });
         }).toList();
 

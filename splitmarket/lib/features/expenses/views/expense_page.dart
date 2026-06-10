@@ -410,16 +410,31 @@ class _ExpensePageState
           ),
         ),
 
-        subtitle: Text(
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Pago por: ${expense.payer}',
+              style: TextStyle(
+                color: Colors.grey[700],
+                fontSize: 14,
+              ),
+            ),
+            if (expense.location != null &&
+                expense.location!.isNotEmpty)
 
-          'Pago por: ${expense.payer}',
-
-          style: TextStyle(
-
-            color: Colors.grey[700],
-
-            fontSize: 14,
-          ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                     '📍 ${expense.location}',
+                     style: TextStyle(
+                      color: Colors.grey[700],
+                      fontSize: 14,
+                     )
+                  )
+                )
+          ]
         ),
 
         trailing: Row(
