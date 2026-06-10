@@ -6,6 +6,7 @@ class ExpenseModel {
   final String payer;
   final String? grupoId;
   final DateTime? createdAt;
+  final String? location;
 
   ExpenseModel({
     this.id,
@@ -14,6 +15,7 @@ class ExpenseModel {
     required this.payer,
     this.grupoId,
     this.createdAt,
+    this.location,
   });
 
   Map<String, dynamic> toMap(){
@@ -24,6 +26,7 @@ class ExpenseModel {
       'payer': payer,
       'grupoId': grupoId,
       'createdAt': createdAt?.toIso8601String(),
+      'location': location,
     };
   }
   factory ExpenseModel.fromMap(
@@ -36,6 +39,7 @@ class ExpenseModel {
       payer: map['payer'],
       grupoId: map['grupoId'],
       createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt']) : null,
+      location: map['location'],
     );
   }
 
@@ -47,6 +51,7 @@ class ExpenseModel {
       payer: json['payer'] ?? '',
       grupoId: json['grupoId'],
       createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
+      location: json['location'],
     );
   }
 }

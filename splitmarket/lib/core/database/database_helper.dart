@@ -29,7 +29,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -48,6 +48,7 @@ class DatabaseHelper {
         payer TEXT NOT NULL,
         grupoId TEXT,
         createdAt TEXT
+        location TEXT
       )
     ''');
   }
@@ -60,6 +61,9 @@ class DatabaseHelper {
     if (oldVersion < 2) {
       await db.execute('ALTER TABLE expenses ADD COLUMN grupoId TEXT');
       await db.execute('ALTER TABLE expenses ADD COLUMN createdAt TEXT');
+    }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE expenses ADD COLUMN location TEXT');
     }
   }
 
