@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -33,12 +34,36 @@ class _HomePageState extends State<HomePage> {
   bool _showPayables = false;
   bool _isLoadingName = true;
   final ImagePicker _imagePicker = ImagePicker();
-  final Map<String, String> _memberIdToName = {}; // Map UID -> name
+  final Map<String, String> _memberIdToName = {};
+
+  // 🎯 Focus nodes
+  final FocusNode _receivableCardFocusNode = FocusNode();
+  final FocusNode _payableCardFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    _loadDashboardData();
+    // ✅ CORRIGIDO: Usar addPostFrameCallback para evitar erro de build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadDashboardData();
+    });
+  }
+
+  @override
+  void dispose() {
+    _receivableCardFocusNode.dispose();
+    _payableCardFocusNode.dispose();
+    super.dispose();
+  }
+
+  // 🗣️ Método para anunciar ao TalkBack
+  void _announceToTalkBack(String message) {
+    if (mounted) {
+      SemanticsService.announce(
+        message,
+        Directionality.of(context),
+      );
+    }
   }
 
   Future<void> _loadDashboardData() async {
@@ -91,7 +116,7 @@ class _HomePageState extends State<HomePage> {
         }
       }
     } catch (e) {
-      print('Erro ao carregar nomes dos membros: $e');
+      debugPrint('Erro ao carregar nomes dos membros: $e');
     }
   }
 
@@ -120,7 +145,7 @@ class _HomePageState extends State<HomePage> {
         }
       }
     } catch (e) {
-      print('Erro ao buscar nome: $e');
+      debugPrint('Erro ao buscar nome: $e');
       setState(() {
         _isLoadingName = false;
       });
@@ -157,7 +182,7 @@ class _HomePageState extends State<HomePage> {
         final n = _selectedGroup!.membros.length;
         final share = expense.value / n;
         for (var memberId in _selectedGroup!.membros) {
-          if (memberId == userId) continue; // Skip current user
+          if (memberId == userId) continue;
           final memberName = _memberIdToName[memberId] ?? 'Desconhecido';
           aggregated[memberName] = (aggregated[memberName] ?? 0) + share;
         }
@@ -215,6 +240,11 @@ class _HomePageState extends State<HomePage> {
       _showReceivables = !_showReceivables;
       if (_showReceivables) _showPayables = false;
     });
+    _announceToTalkBack(
+      _showReceivables 
+          ? 'Mostrando valores a receber' 
+          : 'Ocultando valores a receber'
+    );
   }
 
   void _togglePayables() {
@@ -222,68 +252,162 @@ class _HomePageState extends State<HomePage> {
       _showPayables = !_showPayables;
       if (_showPayables) _showReceivables = false;
     });
+    _announceToTalkBack(
+      _showPayables 
+          ? 'Mostrando valores a pagar' 
+          : 'Ocultando valores a pagar'
+    );
   }
 
   Future<void> _showCreateGroupDialog() async {
     final TextEditingController groupNameController = TextEditingController();
+    final FocusNode textFieldFocusNode = FocusNode();
     
     return showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Novo Grupo'),
-        content: TextField(
-          controller: groupNameController,
-          decoration: const InputDecoration(
-            hintText: 'Ex: Viagem, Casa, Faculdade...',
-            labelText: 'Nome do grupo',
-            border: OutlineInputBorder(),
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final groupName = groupNameController.text.trim();
-              if (groupName.isNotEmpty) {
-                final groupProvider = Provider.of<GroupProvider>(
-                  context,
-                  listen: false,
-                );
-                await groupProvider.criarGrupo(groupName);
-                
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Grupo "$groupName" criado!'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                  await _loadDashboardData();
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF8E76F7),
+      builder: (context) => Semantics(
+        container: true,
+        label: 'Diálogo para criar novo grupo',
+        child: AlertDialog(
+          title: Semantics(
+            header: true,
+            label: 'Novo Grupo',
+            child: Text(
+              'Novo Grupo',
+              style: TextStyle(
+                fontSize: 20 * MediaQuery.of(context).textScaleFactor,
+              ),
             ),
-            child: const Text('Criar'),
           ),
-        ],
+          content: Semantics(
+            textField: true,
+            label: 'Nome do grupo',
+            hint: 'Digite o nome do novo grupo',
+            child: TextField(
+              controller: groupNameController,
+              focusNode: textFieldFocusNode,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'Ex: Viagem, Casa, Faculdade...',
+                labelText: 'Nome do grupo',
+                border: const OutlineInputBorder(),
+                hintStyle: TextStyle(
+                  fontSize: 14 * MediaQuery.of(context).textScaleFactor,
+                ),
+                labelStyle: TextStyle(
+                  fontSize: 16 * MediaQuery.of(context).textScaleFactor,
+                ),
+              ),
+              style: TextStyle(
+                fontSize: 16 * MediaQuery.of(context).textScaleFactor,
+              ),
+              onSubmitted: (_) async {
+                final groupName = groupNameController.text.trim();
+                if (groupName.isNotEmpty) {
+                  await _criarGrupo(context, groupName);
+                }
+              },
+            ),
+          ),
+          actions: [
+            Semantics(
+              button: true,
+              label: 'Cancelar',
+              hint: 'Cancelar criação do grupo',
+              child: TextButton(
+                onPressed: () {
+                  _announceToTalkBack('Criação de grupo cancelada');
+                  Navigator.pop(context);
+                },
+                child: Text(
+                  'Cancelar',
+                  style: TextStyle(
+                    fontSize: 14 * MediaQuery.of(context).textScaleFactor,
+                  ),
+                ),
+              ),
+            ),
+            Semantics(
+              button: true,
+              label: 'Criar grupo',
+              hint: 'Confirmar criação do novo grupo',
+              child: ElevatedButton(
+                onPressed: () async {
+                  final groupName = groupNameController.text.trim();
+                  if (groupName.isNotEmpty) {
+                    await _criarGrupo(context, groupName);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF8E76F7),
+                ),
+                child: Text(
+                  'Criar',
+                  style: TextStyle(
+                    fontSize: 14 * MediaQuery.of(context).textScaleFactor,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    );
+    ).then((_) {
+      textFieldFocusNode.dispose();
+    });
+  }
+
+  Future<void> _criarGrupo(BuildContext context, String groupName) async {
+    try {
+      final groupProvider = Provider.of<GroupProvider>(
+        context,
+        listen: false,
+      );
+      await groupProvider.criarGrupo(groupName);
+      
+      if (!mounted) return;
+      
+      _announceToTalkBack('Grupo $groupName criado com sucesso');
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Semantics(
+            label: 'Grupo $groupName criado com sucesso',
+            child: Text('Grupo "$groupName" criado!'),
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      await _loadDashboardData();
+    } catch (e) {
+      if (!mounted) return;
+      _announceToTalkBack('Erro ao criar grupo: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Semantics(
+            label: 'Erro ao criar grupo: $e',
+            child: Text('Erro ao criar grupo: $e'),
+          ),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   Future<void> _showSelectGroupDialog() async {
     final groupProvider = Provider.of<GroupProvider>(context, listen: false);
     
     if (groupProvider.grupos.isEmpty) {
+      _announceToTalkBack('Nenhum grupo criado. Crie um novo grupo');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Nenhum grupo criado. Crie um novo grupo!'),
+        SnackBar(
+          content: Semantics(
+            label: 'Nenhum grupo criado. Crie um novo grupo',
+            child: const Text('Nenhum grupo criado. Crie um novo grupo!'),
+          ),
+          duration: const Duration(seconds: 3),
         ),
       );
       return;
@@ -291,96 +415,94 @@ class _HomePageState extends State<HomePage> {
     
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Selecionar Grupo'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: groupProvider.grupos.length,
-            itemBuilder: (context, index) {
-              final grupo = groupProvider.grupos[index];
-              return ListTile(
-                leading: const Icon(Icons.group, color: Color(0xFF8E76F7)),
-                title: Text(grupo.nome),
-                subtitle: Text('${grupo.membros.length} membros'),
-                onTap: () async {
-                  setState(() {
-                    _selectedGroup = grupo;
-                    _currentGroup = grupo.nome;
-                    _currentGroupId = grupo.id;
-                  });
+      builder: (context) => Semantics(
+        container: true,
+        label: 'Diálogo para selecionar grupo',
+        child: AlertDialog(
+          title: Semantics(
+            header: true,
+            label: 'Selecionar Grupo',
+            child: Text(
+              'Selecionar Grupo',
+              style: TextStyle(
+                fontSize: 20 * MediaQuery.of(context).textScaleFactor,
+              ),
+            ),
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Semantics(
+              label: 'Lista de grupos disponíveis',
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: groupProvider.grupos.length,
+                itemBuilder: (context, index) {
+                  final grupo = groupProvider.grupos[index];
+                  return Semantics(
+                    container: true,
+                    label: 'Grupo ${index + 1}: ${grupo.nome}, ${grupo.membros.length} membros',
+                    child: ListTile(
+                      leading: ExcludeSemantics(
+                        excluding: true,
+                        child: const Icon(Icons.group, color: Color(0xFF8E76F7)),
+                      ),
+                      title: Text(
+                        grupo.nome,
+                        style: TextStyle(
+                          fontSize: 16 * MediaQuery.of(context).textScaleFactor,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '${grupo.membros.length} membros',
+                        style: TextStyle(
+                          fontSize: 14 * MediaQuery.of(context).textScaleFactor,
+                        ),
+                      ),
+                      onTap: () async {
+                        _announceToTalkBack('Selecionando grupo ${grupo.nome}');
+                        setState(() {
+                          _selectedGroup = grupo;
+                          _currentGroup = grupo.nome;
+                          _currentGroupId = grupo.id;
+                        });
 
-                  await _loadMemberNames(grupo.membros);
-                  await context.read<ExpenseProvider>().carregarDespesasPorGrupo(grupo.id);
+                        await _loadMemberNames(grupo.membros);
+                        await context.read<ExpenseProvider>().carregarDespesasPorGrupo(grupo.id);
 
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Grupo alterado para "$_currentGroup"'),
+                        Navigator.pop(context);
+                        _announceToTalkBack('Grupo alterado para $_currentGroup');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Semantics(
+                              label: 'Grupo alterado para $_currentGroup',
+                              child: Text('Grupo alterado para "$_currentGroup"'),
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
                     ),
                   );
                 },
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fechar'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Card adaptativo - mantém tamanho original no mobile, aumenta no tablet/desktop
-  Widget _buildSummaryCard({
-    required String title,
-    required double value,
-    required bool active,
-    required VoidCallback onTap,
-    required Color accentColor,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isMobile = ResponsiveLayout.isMobile(context);
-    
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 12 : 20,
-          vertical: isMobile ? 16 : 24,
-        ),
-        decoration: BoxDecoration(
-          color: active
-              ? accentColor.withAlpha((0.12 * 255).round())
-              : (isDark ? const Color(0xFF2D2D2D) : Colors.white),
-          borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-          border: Border.all(
-            color: active ? accentColor : (isDark ? const Color(0xFF3D3D3D) : Colors.grey.shade200),
-            width: active ? 1.5 : 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                color: accentColor,
-                fontSize: isMobile ? 14 : 16,
-                fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'R\$ ${value.toStringAsFixed(2)}',
-              style: TextStyle(
-                color: isDark ? Colors.white : Colors.black87,
-                fontSize: isMobile ? 20 : 28,
-                fontWeight: FontWeight.bold,
+          ),
+          actions: [
+            Semantics(
+              button: true,
+              label: 'Fechar',
+              hint: 'Fechar diálogo de seleção de grupo',
+              child: TextButton(
+                onPressed: () {
+                  _announceToTalkBack('Seleção de grupo cancelada');
+                  Navigator.pop(context);
+                },
+                child: Text(
+                  'Fechar',
+                  style: TextStyle(
+                    fontSize: 14 * MediaQuery.of(context).textScaleFactor,
+                  ),
+                ),
               ),
             ),
           ],
@@ -389,6 +511,74 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // ============================================================
+  // CARD DE RESUMO ACESSÍVEL
+  // ============================================================
+  Widget _buildSummaryCard({
+    required String title,
+    required double value,
+    required bool active,
+    required VoidCallback onTap,
+    required Color accentColor,
+    required FocusNode? focusNode,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isMobile = ResponsiveLayout.isMobile(context);
+    final textScale = MediaQuery.of(context).textScaleFactor;
+    
+    return Semantics(
+      button: true,
+      label: '$title: R\$ ${value.toStringAsFixed(2)}',
+      hint: active 
+          ? 'Toque para ocultar os detalhes' 
+          : 'Toque para ver os detalhes',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 12 : 20,
+            vertical: isMobile ? 16 : 24,
+          ),
+          decoration: BoxDecoration(
+            color: active
+                ? accentColor.withAlpha((0.12 * 255).round())
+                : (isDark ? const Color(0xFF2D2D2D) : Colors.white),
+            borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+            border: Border.all(
+              color: active ? accentColor : (isDark ? const Color(0xFF3D3D3D) : Colors.grey.shade200),
+              width: active ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: accentColor,
+                  fontSize: (isMobile ? 14 : 16) * textScale,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'R\$ ${value.toStringAsFixed(2)}',
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
+                  fontSize: (isMobile ? 20 : 28) * textScale,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // LISTA DE DETALHES ACESSÍVEL
+  // ============================================================
   Widget _buildDetailList({
     required String title,
     required List<DebtModel> items,
@@ -396,161 +586,242 @@ class _HomePageState extends State<HomePage> {
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isMobile = ResponsiveLayout.isMobile(context);
+    final textScale = MediaQuery.of(context).textScaleFactor;
     
     if (items.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Text(
-          'Nenhum registro encontrado.',
-          style: TextStyle(
-            color: isDark ? Colors.white60 : Colors.grey.shade600,
-            fontSize: isMobile ? 13 : 14,
+      return Semantics(
+        label: '$title: Nenhum registro encontrado',
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Text(
+            'Nenhum registro encontrado.',
+            style: TextStyle(
+              color: isDark ? Colors.white60 : Colors.grey.shade600,
+              fontSize: (isMobile ? 13 : 14) * textScale,
+            ),
           ),
         ),
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 20),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: isMobile ? 16 : 18,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black87,
+    return Semantics(
+      container: true,
+      label: '$title, ${items.length} itens',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 20),
+          Semantics(
+            header: true,
+            label: title,
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: (isMobile ? 16 : 18) * textScale,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        ListView.separated(
-          physics: const NeverScrollableScrollPhysics(),
-          shrinkWrap: true,
-          itemCount: items.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 10),
-          itemBuilder: (context, index) {
-            final debt = items[index];
-            return Container(
-              padding: EdgeInsets.all(isMobile ? 14 : 16),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF2D2D2D) : Colors.white,
-                borderRadius: BorderRadius.circular(isMobile ? 14 : 16),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF3D3D3D) : Colors.grey.shade200,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              debt.participant,
-                              style: TextStyle(
-                                fontSize: isMobile ? 14 : 15,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? Colors.white : Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              debt.description,
-                              style: TextStyle(
-                                fontSize: isMobile ? 12 : 13,
-                                color: isDark ? Colors.white60 : Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        'R\$ ${debt.amount.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          color: accentColor,
-                          fontWeight: FontWeight.w700,
-                          fontSize: isMobile ? 14 : 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: debt.status == DebtStatus.paid
-                              ? Colors.green.withOpacity(0.14)
-                              : Colors.orange.withOpacity(0.14),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Text(
-                          debt.statusLabel,
-                          style: TextStyle(
-                            color: debt.status == DebtStatus.paid
-                                ? Colors.green
-                                : Colors.orange.shade700,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-                      if (debt.status == DebtStatus.pending)
-                        ElevatedButton(
-                          onPressed: accentColor == Colors.green
-                              ? () => _openRequestPaymentDialog(debt)
-                              : () => _openDebtPaymentDialog(debt),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: accentColor,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-                          ),
-                          child: Text(accentColor == Colors.green ? 'Solicitar pagamento' : 'Pagar'),
-                        )
-                      else if (debt.status == DebtStatus.awaitingConfirmation && accentColor == Colors.green)
-                        ElevatedButton(
-                          onPressed: () => _openConfirmReceiptDialog(debt),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-                          ),
-                          child: const Text('Confirmar recebimento'),
-                        )
-                      else
-                        Text(
-                          debt.status == DebtStatus.awaitingConfirmation
-                              ? 'Aguardando confirmação'
-                              : 'Comprovante registrado',
-                          style: TextStyle(
-                            color: isDark ? Colors.white70 : Colors.black54,
-                            fontSize: 12,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ],
+          const SizedBox(height: 12),
+          ListView.separated(
+            physics: const NeverScrollableScrollPhysics(),
+            shrinkWrap: true,
+            itemCount: items.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              final debt = items[index];
+              return _buildDebtItem(
+                debt,
+                index,
+                accentColor,
+                isDark,
+                isMobile,
+                textScale,
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
+  // ============================================================
+  // ITEM DE DÍVIDA ACESSÍVEL
+  // ============================================================
+  Widget _buildDebtItem(
+    DebtModel debt,
+    int index,
+    Color accentColor,
+    bool isDark,
+    bool isMobile,
+    double textScale,
+  ) {
+    return Semantics(
+      container: true,
+      label: 'Dívida ${index + 1}: ${debt.participant}, R\$ ${debt.amount.toStringAsFixed(2)}, ${debt.statusLabel}',
+      child: Container(
+        padding: EdgeInsets.all(isMobile ? 14 : 16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2D2D2D) : Colors.white,
+          borderRadius: BorderRadius.circular(isMobile ? 14 : 16),
+          border: Border.all(
+            color: isDark ? const Color(0xFF3D3D3D) : Colors.grey.shade200,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Semantics(
+                        label: 'Participante: ${debt.participant}',
+                        child: Text(
+                          debt.participant,
+                          style: TextStyle(
+                            fontSize: (isMobile ? 14 : 15) * textScale,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Semantics(
+                        label: debt.description,
+                        child: Text(
+                          debt.description,
+                          style: TextStyle(
+                            fontSize: (isMobile ? 12 : 13) * textScale,
+                            color: isDark ? Colors.white60 : Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Semantics(
+                  label: 'Valor: R\$ ${debt.amount.toStringAsFixed(2)}',
+                  child: Text(
+                    'R\$ ${debt.amount.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      color: accentColor,
+                      fontWeight: FontWeight.w700,
+                      fontSize: (isMobile ? 14 : 16) * textScale,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Semantics(
+                  label: 'Status: ${debt.statusLabel}',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: debt.status == DebtStatus.paid
+                          ? Colors.green.withOpacity(0.14)
+                          : Colors.orange.withOpacity(0.14),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(
+                      debt.statusLabel,
+                      style: TextStyle(
+                        color: debt.status == DebtStatus.paid
+                            ? Colors.green
+                            : Colors.orange.shade700,
+                        fontSize: 12 * textScale,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                if (debt.status == DebtStatus.pending)
+                  Semantics(
+                    button: true,
+                    label: accentColor == Colors.green 
+                        ? 'Solicitar pagamento para ${debt.participant}' 
+                        : 'Pagar dívida para ${debt.participant}',
+                    hint: accentColor == Colors.green 
+                        ? 'Toque para solicitar o pagamento' 
+                        : 'Toque para pagar esta dívida',
+                    child: ElevatedButton(
+                      onPressed: accentColor == Colors.green
+                          ? () => _openRequestPaymentDialog(debt)
+                          : () => _openDebtPaymentDialog(debt),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentColor,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                      ),
+                      child: Text(
+                        accentColor == Colors.green ? 'Solicitar pagamento' : 'Pagar',
+                        style: TextStyle(
+                          fontSize: 12 * textScale,
+                        ),
+                      ),
+                    ),
+                  )
+                else if (debt.status == DebtStatus.awaitingConfirmation && accentColor == Colors.green)
+                  Semantics(
+                    button: true,
+                    label: 'Confirmar recebimento de ${debt.participant}',
+                    hint: 'Toque para confirmar que recebeu o pagamento',
+                    child: ElevatedButton(
+                      onPressed: () => _openConfirmReceiptDialog(debt),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                      ),
+                      child: Text(
+                        'Confirmar recebimento',
+                        style: TextStyle(
+                          fontSize: 12 * textScale,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Semantics(
+                    label: debt.status == DebtStatus.awaitingConfirmation 
+                        ? 'Aguardando confirmação' 
+                        : 'Comprovante registrado',
+                    child: Text(
+                      debt.status == DebtStatus.awaitingConfirmation
+                          ? 'Aguardando confirmação'
+                          : 'Comprovante registrado',
+                      style: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.black54,
+                        fontSize: 12 * textScale,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // ✅ DIÁLOGO PAGAR DÍVIDA - COM CÂMERA E ARQUIVO
+  // ============================================================
   Future<void> _openDebtPaymentDialog(DebtModel debt) async {
     File? proofFile;
     String observation = '';
@@ -561,104 +832,312 @@ class _HomePageState extends State<HomePage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Pagar dívida'),
-              content: SingleChildScrollView(
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text('Você deve R\$ ${debt.amount.toStringAsFixed(2)} para ${debt.participant}.'),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        initialValue: observation,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Observação (opcional)',
-                          border: OutlineInputBorder(),
+            return Semantics(
+              container: true,
+              label: 'Diálogo para pagar dívida',
+              child: AlertDialog(
+                title: Semantics(
+                  header: true,
+                  label: 'Pagar dívida',
+                  child: Text(
+                    'Pagar dívida',
+                    style: TextStyle(
+                      fontSize: 20 * MediaQuery.of(context).textScaleFactor,
+                    ),
+                  ),
+                ),
+                content: SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Semantics(
+                          label: 'Você deve R\$ ${debt.amount.toStringAsFixed(2)} para ${debt.participant}',
+                          child: Text(
+                            'Você deve R\$ ${debt.amount.toStringAsFixed(2)} para ${debt.participant}.',
+                            style: TextStyle(
+                              fontSize: 16 * MediaQuery.of(context).textScaleFactor,
+                            ),
+                          ),
                         ),
-                        onChanged: (value) => observation = value,
-                      ),
-                      const SizedBox(height: 16),
-                      if (proofFile != null)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        const SizedBox(height: 12),
+                        
+                        // 📝 Campo Observação
+                        Semantics(
+                          textField: true,
+                          label: 'Observação',
+                          hint: 'Digite uma observação opcional',
+                          child: TextFormField(
+                            initialValue: observation,
+                            maxLines: 3,
+                            decoration: InputDecoration(
+                              labelText: 'Observação (opcional)',
+                              border: const OutlineInputBorder(),
+                              labelStyle: TextStyle(
+                                fontSize: 16 * MediaQuery.of(context).textScaleFactor,
+                              ),
+                            ),
+                            style: TextStyle(
+                              fontSize: 16 * MediaQuery.of(context).textScaleFactor,
+                            ),
+                            onChanged: (value) => observation = value,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // 📎 Arquivo selecionado
+                        if (proofFile != null)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Semantics(
+                                label: 'Arquivo selecionado: ${proofFile!.path.split('/').last}',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.attach_file, color: Colors.green),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        proofFile!.path.split('/').last,
+                                        style: TextStyle(
+                                          fontSize: 14 * MediaQuery.of(context).textScaleFactor,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          proofFile = null;
+                                        });
+                                        _announceToTalkBack('Arquivo removido');
+                                      },
+                                      icon: const Icon(Icons.close, color: Colors.red, size: 18),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              // Preview para imagens
+                              if (_isImageFile(proofFile!))
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.file(
+                                    proofFile!,
+                                    fit: BoxFit.cover,
+                                    height: 120,
+                                    width: double.infinity,
+                                  ),
+                                ),
+                              // Preview para PDF
+                              if (_isPdfFile(proofFile!))
+                                Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      const Icon(
+                                        Icons.picture_as_pdf,
+                                        size: 48,
+                                        color: Colors.red,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        '📄 ${proofFile!.path.split('/').last}',
+                                        style: TextStyle(
+                                          fontSize: 14 * MediaQuery.of(context).textScaleFactor,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // 🎯 Botões de seleção
+                        Row(
                           children: [
-                            const Text('Comprovante'),
-                            const SizedBox(height: 8),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.file(
-                                proofFile!,
-                                fit: BoxFit.cover,
-                                height: 160,
+                            // 📸 Câmera
+                            Expanded(
+                              child: Semantics(
+                                button: true,
+                                label: 'Tirar foto',
+                                hint: 'Toque para abrir a câmera e tirar uma foto do comprovante',
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    final picked = await _imagePicker.pickImage(
+                                      source: ImageSource.camera,
+                                      imageQuality: 70,
+                                    );
+                                    if (picked != null) {
+                                      setState(() {
+                                        proofFile = File(picked.path);
+                                      });
+                                      _announceToTalkBack('Foto capturada com sucesso');
+                                    }
+                                  },
+                                  icon: const Icon(Icons.camera_alt, size: 18),
+                                  label: Text(
+                                    'Câmera',
+                                    style: TextStyle(
+                                      fontSize: 14 * MediaQuery.of(context).textScaleFactor,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            
+                            // 📂 Galeria/Arquivos
+                            Expanded(
+                              child: Semantics(
+                                button: true,
+                                label: 'Selecionar arquivo',
+                                hint: 'Toque para selecionar um arquivo da galeria (imagem, PDF, etc.)',
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    final picked = await _imagePicker.pickMedia();
+                                    if (picked != null) {
+                                      setState(() {
+                                        proofFile = File(picked.path);
+                                      });
+                                      _announceToTalkBack('Arquivo selecionado: ${picked.path.split('/').last}');
+                                    }
+                                  },
+                                  icon: const Icon(Icons.folder_open, size: 18),
+                                  label: Text(
+                                    'Arquivo',
+                                    style: TextStyle(
+                                      fontSize: 14 * MediaQuery.of(context).textScaleFactor,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: () async {
-                          final picked = await _imagePicker.pickImage(
-                            source: ImageSource.camera,
-                            imageQuality: 70,
-                          );
-                          if (picked != null) {
-                            setState(() {
-                              proofFile = File(picked.path);
-                            });
-                          }
-                        },
-                        icon: const Icon(Icons.camera_alt),
-                        label: const Text('Tirar foto do comprovante'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (proofFile == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Anexe uma foto do comprovante para concluir o pagamento.'),
+                        
+                        const SizedBox(height: 8),
+                        
+                        // 💡 Dica
+                        Semantics(
+                          label: 'Aceita imagens, PDF e outros formatos de arquivo',
+                          child: Text(
+                            '📎 Aceita imagens, PDF e outros formatos',
+                            style: TextStyle(
+                              fontSize: 12 * MediaQuery.of(context).textScaleFactor,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
                         ),
-                      );
-                      return;
-                    }
-
-                    context.read<NotificationProvider>().addNotification(
-                      DebtNotification(
-                        sender: _userName,
-                        receiver: debt.participant,
-                        amount: debt.amount,
-                        description: debt.description,
-                        status: DebtStatus.awaitingConfirmation,
-                        proofImagePath: proofFile!.path,
-                      ),
-                    );
-
-                    Navigator.of(context).pop();
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Pagamento de R\$ ${debt.amount.toStringAsFixed(2)} registrado. ${debt.participant} receberá a notificação para confirmar.'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                      ],
+                    ),
                   ),
-                  child: const Text('Enviar comprovante'),
                 ),
-              ],
+                actions: [
+                  Semantics(
+                    button: true,
+                    label: 'Cancelar',
+                    hint: 'Cancelar pagamento',
+                    child: TextButton(
+                      onPressed: () {
+                        _announceToTalkBack('Pagamento cancelado');
+                        Navigator.of(context).pop();
+                      },
+                      child: Text(
+                        'Cancelar',
+                        style: TextStyle(
+                          fontSize: 14 * MediaQuery.of(context).textScaleFactor,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Semantics(
+                    button: true,
+                    label: 'Enviar comprovante',
+                    hint: 'Enviar comprovante para confirmar o pagamento',
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (proofFile == null) {
+                          _announceToTalkBack('Anexe um comprovante');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Semantics(
+                                label: 'Anexe um comprovante para concluir o pagamento',
+                                child: const Text('Anexe um comprovante para concluir o pagamento.'),
+                              ),
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                          return;
+                        }
+
+                        // ✅ Salvar o caminho do arquivo
+                        final filePath = proofFile!.path;
+
+                        context.read<NotificationProvider>().addNotification(
+                          DebtNotification(
+                            sender: _userName,
+                            receiver: debt.participant,
+                            amount: debt.amount,
+                            description: debt.description,
+                            status: DebtStatus.awaitingConfirmation,
+                            proofImagePath: filePath,
+                          ),
+                        );
+
+                        Navigator.of(context).pop();
+
+                        _announceToTalkBack('Pagamento registrado. Aguardando confirmação de ${debt.participant}');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Semantics(
+                              label: 'Pagamento registrado. Aguardando confirmação de ${debt.participant}',
+                              child: Text(
+                                'Pagamento de R\$ ${debt.amount.toStringAsFixed(2)} registrado. ${debt.participant} receberá a notificação para confirmar.',
+                              ),
+                            ),
+                            backgroundColor: Colors.green,
+                            duration: const Duration(seconds: 4),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                      ),
+                      child: Text(
+                        'Enviar comprovante',
+                        style: TextStyle(
+                          fontSize: 14 * MediaQuery.of(context).textScaleFactor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         );
@@ -666,25 +1145,90 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // ============================================================
+  // ✅ MÉTODOS AUXILIARES PARA VERIFICAR TIPO DE ARQUIVO
+  // ============================================================
+
+  /// Verifica se o arquivo é uma imagem
+  bool _isImageFile(File file) {
+    final extension = file.path.split('.').last.toLowerCase();
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'heic'];
+    return imageExtensions.contains(extension);
+  }
+
+  /// Verifica se o arquivo é um PDF
+  bool _isPdfFile(File file) {
+    final extension = file.path.split('.').last.toLowerCase();
+    return extension == 'pdf';
+  }
+
+  // ============================================================
+  // DIÁLOGO CONFIRMAR RECEBIMENTO
+  // ============================================================
   Future<void> _openConfirmReceiptDialog(DebtModel debt) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Confirmar recebimento'),
-          content: Text('Você recebeu R\$ ${debt.amount.toStringAsFixed(2)} de ${debt.participant}?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar'),
+      builder: (context) => Semantics(
+        container: true,
+        label: 'Confirmar recebimento',
+        child: AlertDialog(
+          title: Semantics(
+            header: true,
+            label: 'Confirmar recebimento',
+            child: Text(
+              'Confirmar recebimento',
+              style: TextStyle(
+                fontSize: 20 * MediaQuery.of(context).textScaleFactor,
+              ),
             ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Confirmar'),
+          ),
+          content: Semantics(
+            label: 'Você recebeu R\$ ${debt.amount.toStringAsFixed(2)} de ${debt.participant}?',
+            child: Text(
+              'Você recebeu R\$ ${debt.amount.toStringAsFixed(2)} de ${debt.participant}?',
+              style: TextStyle(
+                fontSize: 16 * MediaQuery.of(context).textScaleFactor,
+              ),
+            ),
+          ),
+          actions: [
+            Semantics(
+              button: true,
+              label: 'Cancelar',
+              hint: 'Cancelar confirmação',
+              child: TextButton(
+                onPressed: () {
+                  _announceToTalkBack('Confirmação cancelada');
+                  Navigator.of(context).pop(false);
+                },
+                child: Text(
+                  'Cancelar',
+                  style: TextStyle(
+                    fontSize: 14 * MediaQuery.of(context).textScaleFactor,
+                  ),
+                ),
+              ),
+            ),
+            Semantics(
+              button: true,
+              label: 'Confirmar recebimento',
+              hint: 'Confirmar que você recebeu o pagamento',
+              child: ElevatedButton(
+                onPressed: () {
+                  _announceToTalkBack('Recebimento confirmado');
+                  Navigator.of(context).pop(true);
+                },
+                child: Text(
+                  'Confirmar',
+                  style: TextStyle(
+                    fontSize: 14 * MediaQuery.of(context).textScaleFactor,
+                  ),
+                ),
+              ),
             ),
           ],
-        );
-      },
+        ),
+      ),
     );
 
     if (confirm != true) return;
@@ -695,57 +1239,128 @@ class _HomePageState extends State<HomePage> {
       amount: debt.amount,
     );
 
+    _announceToTalkBack('Recebimento de R\$ ${debt.amount.toStringAsFixed(2)} confirmado');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Recebimento de R\$ ${debt.amount.toStringAsFixed(2)} confirmado.'),
+        content: Semantics(
+          label: 'Recebimento de R\$ ${debt.amount.toStringAsFixed(2)} confirmado',
+          child: Text('Recebimento de R\$ ${debt.amount.toStringAsFixed(2)} confirmado.'),
+        ),
         backgroundColor: Colors.green,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
 
+  // ============================================================
+  // DIÁLOGO SOLICITAR PAGAMENTO
+  // ============================================================
   Future<void> _openRequestPaymentDialog(DebtModel debt) async {
     String message = '';
+    final FocusNode textFieldFocusNode = FocusNode();
+    
     await showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Solicitar pagamento'),
+      builder: (context) => Semantics(
+        container: true,
+        label: 'Solicitar pagamento',
+        child: AlertDialog(
+          title: Semantics(
+            header: true,
+            label: 'Solicitar pagamento',
+            child: Text(
+              'Solicitar pagamento',
+              style: TextStyle(
+                fontSize: 20 * MediaQuery.of(context).textScaleFactor,
+              ),
+            ),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Enviar solicitação de R\$ ${debt.amount.toStringAsFixed(2)} para ${debt.participant}?'),
-              const SizedBox(height: 12),
-              TextField(
-                decoration: const InputDecoration(
-                  labelText: 'Mensagem (opcional)',
-                  border: OutlineInputBorder(),
+              Semantics(
+                label: 'Enviar solicitação de R\$ ${debt.amount.toStringAsFixed(2)} para ${debt.participant}',
+                child: Text(
+                  'Enviar solicitação de R\$ ${debt.amount.toStringAsFixed(2)} para ${debt.participant}?',
+                  style: TextStyle(
+                    fontSize: 16 * MediaQuery.of(context).textScaleFactor,
+                  ),
                 ),
-                onChanged: (v) => message = v,
-                maxLines: 3,
+              ),
+              const SizedBox(height: 12),
+              Semantics(
+                textField: true,
+                label: 'Mensagem',
+                hint: 'Digite uma mensagem opcional',
+                child: TextField(
+                  focusNode: textFieldFocusNode,
+                  decoration: InputDecoration(
+                    labelText: 'Mensagem (opcional)',
+                    border: const OutlineInputBorder(),
+                    labelStyle: TextStyle(
+                      fontSize: 16 * MediaQuery.of(context).textScaleFactor,
+                    ),
+                  ),
+                  style: TextStyle(
+                    fontSize: 16 * MediaQuery.of(context).textScaleFactor,
+                  ),
+                  onChanged: (v) => message = v,
+                  maxLines: 3,
+                ),
               ),
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Solicitação enviada para ${debt.participant}.'),
-                    backgroundColor: Colors.green,
+            Semantics(
+              button: true,
+              label: 'Cancelar',
+              hint: 'Cancelar solicitação',
+              child: TextButton(
+                onPressed: () {
+                  _announceToTalkBack('Solicitação cancelada');
+                  Navigator.of(context).pop();
+                },
+                child: Text(
+                  'Cancelar',
+                  style: TextStyle(
+                    fontSize: 14 * MediaQuery.of(context).textScaleFactor,
                   ),
-                );
-              },
-              child: const Text('Enviar'),
+                ),
+              ),
+            ),
+            Semantics(
+              button: true,
+              label: 'Enviar solicitação',
+              hint: 'Enviar solicitação de pagamento',
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _announceToTalkBack('Solicitação enviada para ${debt.participant}');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Semantics(
+                        label: 'Solicitação enviada para ${debt.participant}',
+                        child: Text('Solicitação enviada para ${debt.participant}.'),
+                      ),
+                      backgroundColor: Colors.green,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                },
+                child: Text(
+                  'Enviar',
+                  style: TextStyle(
+                    fontSize: 14 * MediaQuery.of(context).textScaleFactor,
+                  ),
+                ),
+              ),
             ),
           ],
-        );
-      },
-    );
+        ),
+      ),
+    ).then((_) {
+      textFieldFocusNode.dispose();
+    });
   }
 
   @override
@@ -754,6 +1369,7 @@ class _HomePageState extends State<HomePage> {
     final notificationProvider = Provider.of<NotificationProvider>(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isMobile = ResponsiveLayout.isMobile(context);
+    final textScale = MediaQuery.of(context).textScaleFactor;
     final expenses = expenseProvider.despesas;
     final totalReceivable = _totalReceivable(expenses, notificationProvider);
     final totalPayable = _totalPayable(expenses, notificationProvider);
@@ -763,161 +1379,250 @@ class _HomePageState extends State<HomePage> {
         .where((debt) => debt.status == DebtStatus.awaitingConfirmation)
         .toList();
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: expenseProvider.carregando || _isLoadingName
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  isMobile ? 16 : 32,
-                  isMobile ? 40 : 52,
-                  isMobile ? 16 : 32,
-                  isMobile ? 20 : 32,
+    return Semantics(
+      container: true,
+      label: 'Página inicial',
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: expenseProvider.carregando || _isLoadingName
+            ? Center(
+                child: Semantics(
+                  label: 'Carregando dados',
+                  child: const CircularProgressIndicator(),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$_greeting, $_userName',
-                      style: TextStyle(
-                        fontSize: isMobile ? 24 : 32,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Veja como está sua posição no grupo hoje.',
-                      style: TextStyle(
-                        fontSize: isMobile ? 14 : 16,
-                        color: isDark ? Colors.white60 : Colors.grey.shade600,
-                      ),
-                    ),
-                    SizedBox(height: isMobile ? 24 : 32),
-                    
-                    // Cards lado a lado
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildSummaryCard(
-                            title: 'A receber',
-                            value: totalReceivable,
-                            active: _showReceivables,
-                            accentColor: Colors.green,
-                            onTap: _toggleReceivables,
+              )
+            : SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    isMobile ? 16 : 32,
+                    isMobile ? 40 : 52,
+                    isMobile ? 16 : 32,
+                    isMobile ? 20 : 32,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 👋 Saudação
+                      Semantics(
+                        header: true,
+                        label: '$_greeting, $_userName',
+                        child: Text(
+                          '$_greeting, $_userName',
+                          style: TextStyle(
+                            fontSize: (isMobile ? 24 : 32) * textScale,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black87,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildSummaryCard(
-                            title: 'A pagar',
-                            value: totalPayable,
-                            active: _showPayables,
-                            accentColor: Colors.red,
-                            onTap: _togglePayables,
+                      ),
+                      const SizedBox(height: 4),
+                      Semantics(
+                        label: 'Veja como está sua posição no grupo hoje',
+                        child: Text(
+                          'Veja como está sua posição no grupo hoje.',
+                          style: TextStyle(
+                            fontSize: (isMobile ? 14 : 16) * textScale,
+                            color: isDark ? Colors.white60 : Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: isMobile ? 24 : 32),
+                      
+                      // 📊 Cards lado a lado
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildSummaryCard(
+                              title: 'A receber',
+                              value: totalReceivable,
+                              active: _showReceivables,
+                              accentColor: Colors.green,
+                              focusNode: _receivableCardFocusNode,
+                              onTap: _toggleReceivables,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildSummaryCard(
+                              title: 'A pagar',
+                              value: totalPayable,
+                              active: _showPayables,
+                              accentColor: Colors.red,
+                              focusNode: _payableCardFocusNode,
+                              onTap: _togglePayables,
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      // 📋 Listas de detalhes
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        child: _showReceivables
+                            ? _buildDetailList(
+                                title: 'Quem deve para você',
+                                items: receivables,
+                                accentColor: Colors.green,
+                              )
+                            : _showPayables
+                                ? _buildDetailList(
+                                    title: 'Quem você deve',
+                                    items: payables,
+                                    accentColor: Colors.red,
+                                  )
+                                : Semantics(
+                                    label: 'Toque em um card para ver os participantes',
+                                    child: Padding(
+                                      key: const ValueKey('empty'),
+                                      padding: const EdgeInsets.only(top: 20),
+                                      child: Text(
+                                        'Toque em um card para ver os participantes.',
+                                        style: TextStyle(
+                                          color: isDark ? Colors.white60 : Colors.grey.shade600,
+                                          fontSize: (isMobile ? 13 : 14) * textScale,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                      ),
+                      
+                      // ⚠️ Aviso de comprovantes pendentes
+                      if (awaitingReceivables.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Semantics(
+                          label: 'Você tem ${awaitingReceivables.length} comprovante(s) aguardando validação',
+                          child: Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.all(isMobile ? 14 : 16),
+                            decoration: BoxDecoration(
+                              color: Colors.yellow.shade100,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: Colors.yellow.shade700),
+                            ),
+                            child: Text(
+                              'Você tem ${awaitingReceivables.length} comprovante(s) aguardando validação. Confirme o recebimento para registrar como pago.',
+                              style: TextStyle(
+                                color: Colors.black87,
+                                fontSize: (isMobile ? 13 : 14) * textScale,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ),
                       ],
-                    ),
-                    
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      child: _showReceivables
-                          ? _buildDetailList(
-                              title: 'Quem deve para você',
-                              items: receivables,
-                              accentColor: Colors.green,
-                            )
-                          : _showPayables
-                              ? _buildDetailList(
-                                  title: 'Quem você deve',
-                                  items: payables,
-                                  accentColor: Colors.red,
-                                )
-                              : Padding(
-                                  key: const ValueKey('empty'),
-                                  padding: const EdgeInsets.only(top: 20),
-                                  child: Text(
-                                    'Toque em um card para ver os participantes.',
-                                    style: TextStyle(
-                                      color: isDark ? Colors.white60 : Colors.grey.shade600,
-                                      fontSize: isMobile ? 13 : 14,
-                                    ),
+                      SizedBox(height: isMobile ? 24 : 32),
+                      
+                      // 📋 Lista de dívidas pendentes do grupo atual
+                      Builder(
+                        builder: (context) {
+                          if (_currentGroupId == null) {
+                            return Semantics(
+                              label: 'Nenhum grupo selecionado',
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                child: Text(
+                                  'Nenhum grupo selecionado.',
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white60 : Colors.grey.shade600,
+                                    fontSize: (isMobile ? 13 : 14) * textScale,
                                   ),
                                 ),
-                    ),
-                    if (awaitingReceivables.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.all(isMobile ? 14 : 16),
-                        decoration: BoxDecoration(
-                          color: Colors.yellow.shade100,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.yellow.shade700),
-                        ),
-                        child: Text(
-                          'Você tem ${awaitingReceivables.length} comprovante(s) aguardando validação. Confirme o recebimento para registrar como pago.',
-                          style: TextStyle(
-                            color: Colors.black87,
-                            fontSize: isMobile ? 13 : 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                    SizedBox(height: isMobile ? 24 : 32),
-                    
-                    // Lista de dívidas pendentes do grupo atual (substitui o card de grupo)
-                    Builder(
-                      builder: (context) {
-                        if (_currentGroupId == null) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Text(
-                              'Nenhum grupo selecionado.',
-                              style: TextStyle(
-                                color: isDark ? Colors.white60 : Colors.grey.shade600,
                               ),
-                            ),
-                          );
-                        }
+                            );
+                          }
 
-                        final pendingDebts = _buildPayables(expenses, notificationProvider)
-                            .where((d) => d.status == DebtStatus.pending)
-                            .toList();
-                        final paidDebts = _buildPayables(expenses, notificationProvider)
-                            .where((d) => d.status == DebtStatus.paid)
-                            .toList();
+                          final pendingDebts = _buildPayables(expenses, notificationProvider)
+                              .where((d) => d.status == DebtStatus.pending)
+                              .toList();
+                          final paidDebts = _buildPayables(expenses, notificationProvider)
+                              .where((d) => d.status == DebtStatus.paid)
+                              .toList();
 
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildDetailList(
-                              title: 'Dívidas pendentes — $_currentGroup',
-                              items: pendingDebts,
-                              accentColor: Colors.red,
-                            ),
-                            if (paidDebts.isNotEmpty) ...[
-                              const SizedBox(height: 20),
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Semantics(
+                                header: true,
+                                label: 'Grupo atual: $_currentGroup',
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Row(
+                                    children: [
+                                      ExcludeSemantics(
+                                        excluding: true,
+                                        child: Icon(
+                                          Icons.group,
+                                          color: const Color(0xFF8E76F7),
+                                          size: 20 * textScale,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Grupo: $_currentGroup',
+                                        style: TextStyle(
+                                          fontSize: (isMobile ? 14 : 16) * textScale,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark ? Colors.white : Colors.black87,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Semantics(
+                                        button: true,
+                                        label: 'Trocar grupo',
+                                        hint: 'Toque para selecionar outro grupo',
+                                        child: TextButton.icon(
+                                          onPressed: _showSelectGroupDialog,
+                                          icon: const Icon(Icons.swap_horiz),
+                                          label: Text(
+                                            'Trocar',
+                                            style: TextStyle(
+                                              fontSize: 12 * textScale,
+                                            ),
+                                          ),
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: const Color(0xFF8E76F7),
+                                          ),
+                                        ),
+                                      ),
+                                      Semantics(
+                                        button: true,
+                                        label: 'Criar novo grupo',
+                                        hint: 'Toque para criar um novo grupo',
+                                        child: IconButton(
+                                          onPressed: _showCreateGroupDialog,
+                                          icon: const Icon(Icons.add_circle),
+                                          color: const Color(0xFF8E76F7),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                               _buildDetailList(
-                                title: 'Dívidas pagas — $_currentGroup',
-                                items: paidDebts,
-                                accentColor: Colors.green,
+                                title: 'Dívidas pendentes',
+                                items: pendingDebts,
+                                accentColor: Colors.red,
                               ),
+                              if (paidDebts.isNotEmpty) ...[
+                                const SizedBox(height: 20),
+                                _buildDetailList(
+                                  title: 'Dívidas pagas',
+                                  items: paidDebts,
+                                  accentColor: Colors.green,
+                                ),
+                              ],
                             ],
-                          ],
-                        );
-                      },
-                    ),
-                    
-                    const SizedBox(height: 80),
-                  ],
+                          );
+                        },
+                      ),
+                      
+                      const SizedBox(height: 80),
+                    ],
+                  ),
                 ),
               ),
-            ),
-      bottomNavigationBar: const CustomBottomNavbar(currentIndex: 0),
+        bottomNavigationBar: const CustomBottomNavbar(currentIndex: 0),
+      ),
     );
   }
 }

@@ -72,7 +72,7 @@ class ExpenseProvider
   }
 
   Future<void> deletarDespesa(
-    int id,
+    String id,
   ) async {
 
     await _service.deleteExpense(

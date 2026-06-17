@@ -11,6 +11,11 @@ dependencies:
   flutter:
     sdk: flutter
   
+  # ✅ ADICIONADO - Suporte a internacionalização (TalkBack em português)
+  flutter_localizations:
+    sdk: flutter
+  intl: 0.20.2  # Versão mais recente compatível
+  
   # Firebase - VERSÕES CORRETAS
   firebase_core: ^3.8.0
   firebase_auth: ^5.3.3

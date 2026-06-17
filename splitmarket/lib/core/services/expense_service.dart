@@ -151,7 +151,7 @@ class ExpenseService {
     );
   }
 
-  Future<int> deleteExpense(int id) async{
+  Future<int> deleteExpense(String id) async{
     final db = await _databaseHelper.database;
 
     return await db.delete(
