@@ -36,6 +36,7 @@ dependencies:
 
   # Seleção de imagem/foto
   image_picker: ^1.1.2
+  light: ^5.0.0
 
 dev_dependencies:
   flutter_test:

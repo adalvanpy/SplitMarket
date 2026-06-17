@@ -8,7 +8,7 @@ class PreferencesService {
   static const String _keyUserEmail = 'user_email';
   static const String _keyUserId = 'user_id';
   static const String _keyTheme = 'theme_mode';
-
+  static const String autoThemeKey = 'auto_theme';
   // ==================== LOGIN STATUS ====================
   
   static Future<bool> isLogged() async {
@@ -84,6 +84,18 @@ class PreferencesService {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_keyTheme) ?? false;
   }
+
+  // ==================== AUTO THEME ====================
+
+static Future<void> saveAutoTheme(bool value) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool(autoThemeKey, value);
+}
+
+static Future<bool> getAutoTheme() async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool(autoThemeKey) ?? false;
+}
 
   // ==================== UTILS ====================
   

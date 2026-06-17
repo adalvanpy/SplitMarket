@@ -99,40 +99,37 @@ class ApiService {
     }
   }
 
-  // Adicionar membro ao grupo
-  Future<void> adicionarMembro(String groupId, String userEmail) async {
-    try {
-      // Buscar usuário pelo email
-      final userQuery = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: userEmail)
-          .limit(1)
-          .get();
+  Future<void> adicionarMembro(
+  String groupId,
+  String userEmail,
+) async {
+  try {
+    final groupDoc = await _firestore
+        .collection('groups')
+        .doc(groupId)
+        .get();
 
-      if (userQuery.docs.isEmpty) {
-        throw Exception('Usuário com email $userEmail não encontrado');
-      }
-
-      final userId = userQuery.docs.first.id;
-      final groupDoc = await _firestore.collection('groups').doc(groupId).get();
-      
-      if (!groupDoc.exists) {
-        throw Exception('Grupo não encontrado');
-      }
-
-      final membrosAtuais = List<String>.from(groupDoc.data()?['membros'] ?? []);
-      
-      if (!membrosAtuais.contains(userId)) {
-        await _firestore.collection('groups').doc(groupId).update({
-          'membros': FieldValue.arrayUnion([userId]),
-        });
-      }
-      
-    } catch (e) {
-      print('Erro ao adicionar membro: $e');
-      rethrow;
+    if (!groupDoc.exists) {
+      throw Exception('Grupo não encontrado');
     }
+
+    await _firestore
+        .collection('group_invites')
+        .add({
+      'groupId': groupId,
+      'groupName': groupDoc['nome'],
+      'email': userEmail,
+      'status': 'pending',
+      'createdAt':
+          DateTime.now().toIso8601String(),
+    });
+
+    print('✅ Convite enviado');
+  } catch (e) {
+    print('❌ Erro ao enviar convite: $e');
+    rethrow;
   }
+}
 
   // Remover membro do grupo
   Future<void> removerMembro(String groupId, String userId) async {

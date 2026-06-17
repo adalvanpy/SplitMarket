@@ -67,7 +67,7 @@ class GroupProvider extends ChangeNotifier {
       grupos.add(grupoSalvo);
       
       // Também salvar via ApiService se necessário
-      await _service.criarGrupo(grupoSalvo);
+      
       
       print('✅ Grupo criado: ${grupoSalvo.nome} (ID: ${grupoSalvo.id})');
       
@@ -112,7 +112,7 @@ class GroupProvider extends ChangeNotifier {
         grupos[index] = grupos[index].copyWith(membros: novosMembros);
       }
 
-      print('✅ Membro adicionado ao grupo');
+      print('Convite enviado com Sucesso');
       
     } catch (e) {
       print('❌ Erro ao adicionar membro: $e');
@@ -124,10 +124,70 @@ class GroupProvider extends ChangeNotifier {
   }
 
   // Alias para adicionarMembro
-  Future<void> adicionarParticipante(String groupId, String userEmail) async {
-    return adicionarMembro(groupId, userEmail);
+  Future<void> adicionarParticipante(
+  String groupId,
+  String userEmail,
+) async {
+  final grupo = grupos.firstWhere(
+    (g) => g.id == groupId,
+  );
+
+  await enviarConvite(
+    groupId,
+    grupo.nome,
+    userEmail,
+  );
+}
+ Future<void> enviarConvite(
+  String groupId,
+  String groupName,
+  String userEmail,
+) async {
+  await _firestore
+      .collection('group_invites')
+      .add({
+    'groupId': groupId,
+    'groupName': groupName,
+    'userEmail': userEmail,
+    'status': 'pending',
+    'createdAt':
+        DateTime.now().toIso8601String(),
+  });
+}
+
+Future<void> aceitarConvite(
+  String inviteId,
+  String groupId,
+) async {
+  final userId =
+      FirebaseAuth.instance.currentUser!.uid;
+
+  final groupDoc = await _firestore
+      .collection('groups')
+      .doc(groupId)
+      .get();
+
+  final membros =
+      List<String>.from(groupDoc['membros']);
+
+  if (!membros.contains(userId)) {
+    membros.add(userId);
+
+    await _firestore
+        .collection('groups')
+        .doc(groupId)
+        .update({
+      'membros': membros,
+    });
   }
 
+  await _firestore
+      .collection('group_invites')
+      .doc(inviteId)
+      .update({
+    'status': 'accepted',
+  });
+}
   // 👈 MÉTODO PARA REMOVER GRUPO
   Future<void> removerGrupo(String groupId) async {
     carregando = true;
@@ -174,7 +234,62 @@ class GroupProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+Future<void> sairDoGrupo(
+  String groupId,
+  String userId,
+) async {
+  try {
+    final doc = await _firestore
+        .collection('groups')
+        .doc(groupId)
+        .get();
 
+    final membros =
+        List<String>.from(doc['membros']);
+
+    membros.remove(userId);
+
+    await _firestore
+        .collection('groups')
+        .doc(groupId)
+        .update({
+      'membros': membros,
+    });
+
+    final index =
+        grupos.indexWhere((g) => g.id == groupId);
+
+    if (index != -1) {
+      grupos[index] =
+          grupos[index].copyWith(
+        membros: membros,
+      );
+    }
+
+    notifyListeners();
+  } catch (e) {
+    print('Erro ao sair do grupo: $e');
+    rethrow;
+  }
+}
+Future<bool> possuiDividasPendentes(
+  String groupId,
+  String userId,
+) async {
+  try {
+    final snapshot = await _firestore
+        .collection('debts')
+        .where('groupId', isEqualTo: groupId)
+        .where('participant', isEqualTo: userId)
+        .where('status', isEqualTo: 'pending')
+        .get();
+
+    return snapshot.docs.isNotEmpty;
+  } catch (e) {
+    print('Erro ao verificar dívidas: $e');
+    return false;
+  }
+}
   void limparGrupos() {
     grupos = [];
     notifyListeners();

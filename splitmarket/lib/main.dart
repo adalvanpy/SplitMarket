@@ -23,6 +23,8 @@ import 'features/notifications/viewmodels/notification_provider.dart';
 import 'features/notifications/views/notifications_page.dart';
 import 'features/settings/views/settings_page.dart';
 import 'features/profile/views/profile_page.dart';
+import 'views/sensor/light_sensor_page.dart';
+import 'features/invite/views/invites_page.dart';
 
 // Repositories
 import 'data/repositories/group_repository.dart';
@@ -147,6 +149,8 @@ class _SplitMarketAppState extends State<SplitMarketApp> {
             '/settings': (context) => const SettingsPage(),
             '/notifications': (context) => const NotificationsPage(),
             '/profile': (context) => const ProfilePage(),
+            '/sensor': (context) => const LightSensorPage(),
+            '/invites': (context) => const InvitesPage(),
           },
         );
       },

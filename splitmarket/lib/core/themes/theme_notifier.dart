@@ -3,25 +3,21 @@ import 'package:flutter/material.dart';
 import '../services/preferences_service.dart';
 
 class ThemeNotifier extends ChangeNotifier {
-
   bool _isDarkMode = false;
 
   bool get isDarkMode => _isDarkMode;
 
   ThemeMode get currentTheme {
-
     return _isDarkMode
         ? ThemeMode.dark
         : ThemeMode.light;
   }
 
   ThemeNotifier() {
-
     loadTheme();
   }
 
   Future<void> loadTheme() async {
-
     _isDarkMode =
         await PreferencesService.getTheme();
 
@@ -29,8 +25,27 @@ class ThemeNotifier extends ChangeNotifier {
   }
 
   Future<void> toggleTheme() async {
-
     _isDarkMode = !_isDarkMode;
+
+    await PreferencesService.saveTheme(
+      _isDarkMode,
+    );
+
+    notifyListeners();
+  }
+
+  Future<void> setDarkTheme() async {
+    _isDarkMode = true;
+
+    await PreferencesService.saveTheme(
+      _isDarkMode,
+    );
+
+    notifyListeners();
+  }
+
+  Future<void> setLightTheme() async {
+    _isDarkMode = false;
 
     await PreferencesService.saveTheme(
       _isDarkMode,

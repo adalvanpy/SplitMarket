@@ -1,0 +1,855 @@
+diff --git a/splitmarket/android/app/src/main/AndroidManifest.xml b/splitmarket/android/app/src/main/AndroidManifest.xml
+index 95d5c85..bfebb11 100644
+--- a/splitmarket/android/app/src/main/AndroidManifest.xml
++++ b/splitmarket/android/app/src/main/AndroidManifest.xml
+@@ -2,6 +2,7 @@
+ 
+     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
++    <uses-permission android:name="android.permission.CAMERA"/>
+     
+     <application
+         android:label="splitmarket"
+diff --git a/splitmarket/ios/Runner/Info.plist b/splitmarket/ios/Runner/Info.plist
+index b62b740..e354224 100644
+--- a/splitmarket/ios/Runner/Info.plist
++++ b/splitmarket/ios/Runner/Info.plist
+@@ -28,6 +28,11 @@
+ 	<true/>
+ 	<key>UIApplicationSceneManifest</key>
+ 	<dict>
++    <key>NSCameraUsageDescription</key>
++<string>Necessário para tirar foto de perfil</string>
++
++<key>NSPhotoLibraryUsageDescription</key>
++<string>Necessário para selecionar foto de perfil</string>
+ 		<key>UIApplicationSupportsMultipleScenes</key>
+ 		<false/>
+ 		<key>UISceneConfigurations</key>
+diff --git a/splitmarket/lib/data/repositories/group_repository.dart b/splitmarket/lib/data/repositories/group_repository.dart
+index cacaa31..36fa41b 100644
+--- a/splitmarket/lib/data/repositories/group_repository.dart
++++ b/splitmarket/lib/data/repositories/group_repository.dart
+@@ -68,7 +68,6 @@ class GroupProvider extends ChangeNotifier {
+       
+       // Também salvar via ApiService se necessário
+       
+-      
+       print('✅ Grupo criado: ${grupoSalvo.nome} (ID: ${grupoSalvo.id})');
+       
+     } catch (e) {
+diff --git a/splitmarket/lib/features/auth/views/register_page.dart b/splitmarket/lib/features/auth/views/register_page.dart
+index 1484359..af06399 100644
+--- a/splitmarket/lib/features/auth/views/register_page.dart
++++ b/splitmarket/lib/features/auth/views/register_page.dart
+@@ -131,11 +131,12 @@ class _RegisterPageState extends State<RegisterPage> {
+         title: const Text('Cadastro'),
+       ),
+       body: SafeArea(
+-        child: Center(
++        child: Align(
++        alignment: Alignment.topCenter,
+           child: SingleChildScrollView(
+             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+             child: ConstrainedBox(
+-              constraints: const BoxConstraints(maxWidth: 500),
++              constraints: const BoxConstraints(maxWidth: 700),
+               child: Form(
+                 key: _formKey,
+                 child: Column(
+diff --git a/splitmarket/lib/features/groups/views/group_detail_page.dart b/splitmarket/lib/features/groups/views/group_detail_page.dart
+index 2a21b2c..3fb322c 100644
+--- a/splitmarket/lib/features/groups/views/group_detail_page.dart
++++ b/splitmarket/lib/features/groups/views/group_detail_page.dart
+@@ -57,6 +57,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
+       setState(() => _loadingNames = false);
+     }
+   }
++  
+ 
+   String _getUserName(String userId) {
+     return _userNames[userId] ?? userId;
+@@ -65,7 +66,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
+   void _loadDespesas() {
+     _despesasFuture = _expenseService.getExpensesByGroup(widget.grupo.id);
+   }
+-
++  
+   double _calcularTotalPago(List<ExpenseModel> despesas) {
+     return despesas.fold(0.0, (sum, expense) => sum + expense.value);
+   }
+@@ -250,7 +251,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
+             ),
+         ],
+       ),
+-      bottomNavigationBar: const CustomBottomNavbar(currentIndex: 2),
++      bottomNavigationBar: const CustomBottomNavbar(currentIndex: 3),
+     );
+   }
+ 
+diff --git a/splitmarket/lib/features/groups/views/group_page.dart b/splitmarket/lib/features/groups/views/group_page.dart
+index 16b3bff..70ed401 100644
+--- a/splitmarket/lib/features/groups/views/group_page.dart
++++ b/splitmarket/lib/features/groups/views/group_page.dart
+@@ -108,7 +108,7 @@ class _GroupPageState extends State<GroupPage> {
+         backgroundColor: const Color(0xFF8E76F7),
+         child: const Icon(Icons.add),
+       ),
+-      bottomNavigationBar: const CustomBottomNavbar(currentIndex: 2),
++      bottomNavigationBar: const CustomBottomNavbar(currentIndex: 3),
+     );
+   }
+ 
+@@ -196,7 +196,7 @@ class _GroupPageState extends State<GroupPage> {
+                     Navigator.pop(context);
+                     ScaffoldMessenger.of(context).showSnackBar(
+                       const SnackBar(
+-                        content: Text('Participante adicionado com sucesso!'),
++                        content: Text('Convite enviado com sucesso'),
+                         backgroundColor: Colors.green,
+                       ),
+                     );
+diff --git a/splitmarket/lib/features/home/views/home_page.dart b/splitmarket/lib/features/home/views/home_page.dart
+index f4e2e23..b0e0c7d 100644
+--- a/splitmarket/lib/features/home/views/home_page.dart
++++ b/splitmarket/lib/features/home/views/home_page.dart
+@@ -5,7 +5,8 @@ import 'package:provider/provider.dart';
+ import 'package:cloud_firestore/cloud_firestore.dart';
+ import 'package:firebase_auth/firebase_auth.dart';
+ import 'package:image_picker/image_picker.dart';
+-
++import 'package:file_picker/file_picker.dart';
++import 'package:flutter/foundation.dart';
+ import '../../../core/services/preferences_service.dart';
+ import '../../../data/models/debt_model.dart';
+ import '../../../data/models/expense_model.dart';
+@@ -17,6 +18,9 @@ import '../../notifications/viewmodels/notification_provider.dart';
+ import '../../../shared/widgets/custom_buttom_navbar.dart';
+ import '../../../shared/widgets/responsive_layout.dart';
+ import 'package:splitmarket/features/invite/views/invites_page.dart';
++import 'dart:convert';
++
++
+ 
+ class HomePage extends StatefulWidget {
+   const HomePage({super.key});
+@@ -33,13 +37,17 @@ class _HomePageState extends State<HomePage> {
+   bool _showReceivables = false;
+   bool _showPayables = false;
+   bool _isLoadingName = true;
++  String? _photoUrl;
+   final ImagePicker _imagePicker = ImagePicker();
++  
+   final Map<String, String> _memberIdToName = {}; // Map UID -> name
+ 
+   @override
+   void initState() {
+     super.initState();
+     _loadDashboardData();
++   // _loadProfileImage();
++  
+   }
+ 
+   Future<void> _loadDashboardData() async {
+@@ -72,6 +80,24 @@ class _HomePageState extends State<HomePage> {
+       }
+     });
+   }
++  Future<void> _loadProfileImage() async {
++  try {
++    final userId = FirebaseAuth.instance.currentUser!.uid;
++
++    final doc = await FirebaseFirestore.instance
++        .collection('users')
++        .doc(userId)
++        .get();
++
++    if (doc.exists && doc.data()?['photoUrl'] != null) {
++      setState(() {
++        _photoUrl = doc.data()!['photoUrl'];
++      });
++    }
++  } catch (e) {
++    print('Erro ao carregar foto: $e');
++  }
++}
+ 
+   Future<void> _loadMemberNames(List<String> memberIds) async {
+     _memberIdToName.clear();
+@@ -108,9 +134,10 @@ class _HomePageState extends State<HomePage> {
+         if (doc.exists) {
+           final nome = doc.data()?['name'] ?? 'Usuário';
+           setState(() {
+-            _userName = nome;
+-            _isLoadingName = false;
+-          });
++  _userName = nome;
++  _photoUrl = doc.data()?['photoBase64'];
++  _isLoadingName = false;
++});
+           await PreferencesService.saveUserName(nome);
+         } else {
+           final email = FirebaseAuth.instance.currentUser?.email;
+@@ -509,6 +536,7 @@ class _HomePageState extends State<HomePage> {
+                           onPressed: accentColor == Colors.green
+                               ? () => _openRequestPaymentDialog(debt)
+                               : () => _openDebtPaymentDialog(debt),
++                    
+                           style: ElevatedButton.styleFrom(
+                             backgroundColor: accentColor,
+                             padding: const EdgeInsets.symmetric(
+@@ -581,38 +609,62 @@ class _HomePageState extends State<HomePage> {
+                         onChanged: (value) => observation = value,
+                       ),
+                       const SizedBox(height: 16),
+-                      if (proofFile != null)
+-                        Column(
+-                          crossAxisAlignment: CrossAxisAlignment.start,
+-                          children: [
+-                            const Text('Comprovante'),
+-                            const SizedBox(height: 8),
+-                            ClipRRect(
+-                              borderRadius: BorderRadius.circular(12),
+-                              child: Image.file(
+-                                proofFile!,
+-                                fit: BoxFit.cover,
+-                                height: 160,
+-                              ),
+-                            ),
+-                          ],
+-                        ),
++                     if (proofFile != null)
++  Column(
++    crossAxisAlignment: CrossAxisAlignment.start,
++    children: [
++      const Text('Comprovante'),
++      const SizedBox(height: 8),
++
++      Builder(
++        builder: (context) {
++          final extension =
++              proofFile!.path.split('.').last.toLowerCase();
++
++          if (extension == 'pdf') {
++            return Container(
++              height: 100,
++              alignment: Alignment.center,
++              child: const Row(
++                mainAxisAlignment: MainAxisAlignment.center,
++                children: [
++                  Icon(Icons.picture_as_pdf, color: Colors.red),
++                  SizedBox(width: 8),
++                  Text('Arquivo PDF selecionado'),
++                ],
++              ),
++            );
++          }
++
++          return ClipRRect(
++            borderRadius: BorderRadius.circular(12),
++            child: Image.file(
++              proofFile!,
++              fit: BoxFit.cover,
++              height: 160,
++            ),
++          );
++        },
++      ),
++    ],
++  ),
+                       const SizedBox(height: 16),
+                       ElevatedButton.icon(
+-                        onPressed: () async {
+-                          final picked = await _imagePicker.pickImage(
+-                            source: ImageSource.camera,
+-                            imageQuality: 70,
+-                          );
+-                          if (picked != null) {
+-                            setState(() {
+-                              proofFile = File(picked.path);
+-                            });
+-                          }
+-                        },
+-                        icon: const Icon(Icons.camera_alt),
+-                        label: const Text('Tirar foto do comprovante'),
+-                      ),
++  onPressed: () async {
++    final picked = await _imagePicker.pickImage(
++      source: ImageSource.gallery,
++      imageQuality: 70,
++    );
++
++    if (picked != null) {
++      setState(() {
++        proofFile = File(picked.path);
++      });
++    }
++  },
++  icon: const Icon(Icons.attach_file),
++  label: const Text('Selecionar comprovante'),
++),
+                     ],
+                   ),
+                 ),
+@@ -747,7 +799,69 @@ class _HomePageState extends State<HomePage> {
+       },
+     );
+   }
++ Future<void> _pickProfileImage(ImageSource source) async {
++  final XFile? image = await _imagePicker.pickImage(
++    source: source,
++    imageQuality: 40,
++    maxWidth: 500,
++  );
++
++  if (image == null) return;
++
++  final bytes = await image.readAsBytes();
++  final base64Image = base64Encode(bytes);
++
++  final userId = FirebaseAuth.instance.currentUser!.uid;
++
++  await FirebaseFirestore.instance
++      .collection('users')
++      .doc(userId)
++      .set({
++    'photoBase64': base64Image,
++  }, SetOptions(merge: true));
+ 
++  if (!mounted) return;
++
++  setState(() {
++    _photoUrl = base64Image;
++  });
++
++  ScaffoldMessenger.of(context).showSnackBar(
++    const SnackBar(
++      content: Text('Foto atualizada com sucesso!'),
++      backgroundColor: Colors.green,
++    ),
++  );
++}
++void _showProfileImageOptions() {
++  showModalBottomSheet(
++    context: context,
++    builder: (context) {
++      return SafeArea(
++        child: Wrap(
++          children: [
++            ListTile(
++              leading: const Icon(Icons.camera_alt),
++              title: const Text('Tirar foto'),
++              onTap: () {
++                Navigator.pop(context);
++                _pickProfileImage(ImageSource.camera);
++              },
++            ),
++            ListTile(
++              leading: const Icon(Icons.photo_library),
++              title: const Text('Escolher da galeria'),
++              onTap: () {
++                Navigator.pop(context);
++                _pickProfileImage(ImageSource.gallery);
++              },
++            ),
++          ],
++        ),
++      );
++    },
++  );
++}
+   @override
+   Widget build(BuildContext context) {
+     final expenseProvider = Provider.of<ExpenseProvider>(context);
+@@ -778,22 +892,77 @@ class _HomePageState extends State<HomePage> {
+                 child: Column(
+                   crossAxisAlignment: CrossAxisAlignment.start,
+                   children: [
+-                    Text(
+-                      '$_greeting, $_userName',
+-                      style: TextStyle(
+-                        fontSize: isMobile ? 24 : 32,
+-                        fontWeight: FontWeight.bold,
+-                        color: isDark ? Colors.white : Colors.black87,
+-                      ),
+-                    ),
+-                    const SizedBox(height: 4),
+-                    Text(
+-                      'Veja como está sua posição no grupo hoje.',
+-                      style: TextStyle(
+-                        fontSize: isMobile ? 14 : 16,
+-                        color: isDark ? Colors.white60 : Colors.grey.shade600,
+-                      ),
+-                    ),
++                    Row(
++  crossAxisAlignment: CrossAxisAlignment.start,
++  children: [
++   Stack(
++  children: [
++   CircleAvatar(
++  radius: isMobile ? 30 : 40,
++  backgroundColor: Colors.grey.shade300,
++  backgroundImage: _photoUrl != null
++      ? MemoryImage(base64Decode(_photoUrl!))
++      : null,
++  child: _photoUrl == null
++      ? Icon(
++          Icons.person,
++          size: isMobile ? 35 : 45,
++          color: Colors.grey.shade700,
++        )
++      : null,
++),
++
++    Positioned(
++      bottom: 0,
++      right: 0,
++      child: GestureDetector(
++        onTap: _showProfileImageOptions,
++        child: Container(
++          padding: const EdgeInsets.all(6),
++          decoration: const BoxDecoration(
++            color: Color(0xFF8E76F7),
++            shape: BoxShape.circle,
++          ),
++          child: const Icon(
++            Icons.camera_alt,
++            color: Colors.white,
++            size: 18,
++          ),
++        ),
++      ),
++    ),
++  ],
++),
++
++    const SizedBox(width: 12),
++
++    Expanded(
++      child: Column(
++        crossAxisAlignment: CrossAxisAlignment.start,
++        children: [
++          Text(
++            '$_greeting, $_userName',
++            style: TextStyle(
++              fontSize: isMobile ? 24 : 32,
++              fontWeight: FontWeight.bold,
++              color: isDark ? Colors.white : Colors.black87,
++            ),
++          ),
++          const SizedBox(height: 4),
++          Text(
++            'Veja como está sua posição no grupo hoje.',
++            style: TextStyle(
++              fontSize: isMobile ? 14 : 16,
++              color: isDark
++                  ? Colors.white60
++                  : Colors.grey.shade600,
++            ),
++          ),
++        ],
++      ),
++    ),
++  ],
++),
+                     SizedBox(height: isMobile ? 24 : 32),
+                     const SizedBox(height: 10),
+                     // Cards lado a lado
+diff --git a/splitmarket/lib/features/invitations/debt_service.dart b/splitmarket/lib/features/invitations/debt_service.dart
+index e69de29..9e08eb7 100644
+--- a/splitmarket/lib/features/invitations/debt_service.dart
++++ b/splitmarket/lib/features/invitations/debt_service.dart
+@@ -0,0 +1,20 @@
++import 'package:cloud_firestore/cloud_firestore.dart';
++
++class DebtService {
++  final FirebaseFirestore _firestore =
++      FirebaseFirestore.instance;
++
++  Future<bool> possuiDividasPendentes(
++    String userId,
++    String grupoId,
++  ) async {
++    final result = await _firestore
++        .collection('debts')
++        .where('grupoId', isEqualTo: grupoId)
++        .where('userId', isEqualTo: userId)
++        .where('status', isEqualTo: 'pending')
++        .get();
++
++    return result.docs.isNotEmpty;
++  }
++}
+\ No newline at end of file
+diff --git a/splitmarket/lib/features/invite/views/invites_page.dart b/splitmarket/lib/features/invite/views/invites_page.dart
+index a4b651a..edf1434 100644
+--- a/splitmarket/lib/features/invite/views/invites_page.dart
++++ b/splitmarket/lib/features/invite/views/invites_page.dart
+@@ -145,7 +145,7 @@ class InvitesPage extends StatelessWidget {
+           );
+         },
+       ),
+-       bottomNavigationBar: const CustomBottomNavbar(currentIndex: 0),
++       bottomNavigationBar: const CustomBottomNavbar(currentIndex: 2),
+     );
+   }
+ }
+\ No newline at end of file
+diff --git a/splitmarket/lib/features/profile/views/profile_page.dart b/splitmarket/lib/features/profile/views/profile_page.dart
+index a4077ac..0570e91 100644
+--- a/splitmarket/lib/features/profile/views/profile_page.dart
++++ b/splitmarket/lib/features/profile/views/profile_page.dart
+@@ -10,6 +10,7 @@ import '../../../data/models/user_model.dart';
+ import '../../../data/repositories/expense_repository.dart';
+ import '../../../data/repositories/group_repository.dart';
+ import '../../../shared/widgets/custom_buttom_navbar.dart';
++import 'dart:convert';
+ 
+ class ProfilePage extends StatefulWidget {
+   const ProfilePage({super.key});
+@@ -23,6 +24,7 @@ class _ProfilePageState extends State<ProfilePage> {
+   bool _isLoading = true;
+   bool _isEditing = false;
+   String? _errorMessage;
++  String? _photoBase64;
+   
+   final TextEditingController _nameController = TextEditingController();
+   final TextEditingController _emailController = TextEditingController();
+@@ -79,6 +81,7 @@ class _ProfilePageState extends State<ProfilePage> {
+       if (doc.exists) {
+         print('✅ Dados encontrados: ${doc.data()}');
+         _user = UserModel.fromMap(doc.id, doc.data()!);
++        _photoBase64 = doc.data()?['photoBase64'];
+         _nameController.text = _user?.name ?? '';
+         _emailController.text = _user?.email ?? '';
+       } else {
+@@ -273,7 +276,7 @@ class _ProfilePageState extends State<ProfilePage> {
+           ),
+         ],
+       ),
+-      bottomNavigationBar: const CustomBottomNavbar(currentIndex: 3),
++      bottomNavigationBar: const CustomBottomNavbar(currentIndex: 4),
+     );
+   }
+ 
+@@ -307,50 +310,60 @@ class _ProfilePageState extends State<ProfilePage> {
+   }
+ 
+   Widget _buildAvatar() {
+-    return Container(
+-      width: 120,
+-      height: 120,
+-      decoration: BoxDecoration(
+-        shape: BoxShape.circle,
+-        gradient: const LinearGradient(
+-          begin: Alignment.topLeft,
+-          end: Alignment.bottomRight,
+-          colors: [Color(0xFF8E76F7), Color(0xFFB993F9)],
++  final hasPhoto = _photoBase64 != null && _photoBase64!.isNotEmpty;
++
++  return Container(
++    width: 120,
++    height: 120,
++    decoration: BoxDecoration(
++      shape: BoxShape.circle,
++      gradient: hasPhoto
++          ? null
++          : const LinearGradient(
++              begin: Alignment.topLeft,
++              end: Alignment.bottomRight,
++              colors: [Color(0xFF8E76F7), Color(0xFFB993F9)],
++            ),
++      boxShadow: [
++        BoxShadow(
++          color: Colors.black.withOpacity(0.1),
++          blurRadius: 10,
++          offset: const Offset(0, 5),
+         ),
+-        boxShadow: [
+-          BoxShadow(
+-            color: Colors.black.withOpacity(0.1),
+-            blurRadius: 10,
+-            offset: const Offset(0, 5),
+-          ),
+-        ],
+-      ),
+-      child: ClipOval(
+-        child: _buildAvatarInitials(),
+-      ),
+-    );
+-  }
++      ],
++    ),
++    child: ClipOval(
++      child: hasPhoto
++          ? Image.memory(
++              base64Decode(_photoBase64!),
++              fit: BoxFit.cover,
++              width: 120,
++              height: 120,
++            )
++          : _buildAvatarInitials(),
++    ),
++  );
++}
+ 
+-  Widget _buildAvatarInitials() {
+-    final String initials = _user?.name.isNotEmpty == true
+-        ? _user!.name[0].toUpperCase()
+-        : '?';
+-    
+-    return Container(
+-      color: Colors.white.withOpacity(0.3),
+-      child: Center(
+-        child: Text(
+-          initials,
+-          style: const TextStyle(
+-            fontSize: 48,
+-            fontWeight: FontWeight.bold,
+-            color: Colors.white,
+-          ),
++Widget _buildAvatarInitials() {
++  final String initials = _user?.name.isNotEmpty == true
++      ? _user!.name[0].toUpperCase()
++      : '?';
++
++  return Container(
++    color: Colors.white.withOpacity(0.3),
++    child: Center(
++      child: Text(
++        initials,
++        style: const TextStyle(
++          fontSize: 48,
++          fontWeight: FontWeight.bold,
++          color: Colors.white,
+         ),
+       ),
+-    );
+-  }
+-
++    ),
++  );
++}
+   Widget _buildInfoCard() {
+     return Container(
+       padding: const EdgeInsets.all(20),
+diff --git a/splitmarket/lib/features/settings/views/settings_page.dart b/splitmarket/lib/features/settings/views/settings_page.dart
+index 3176b4b..9a8ddf1 100644
+--- a/splitmarket/lib/features/settings/views/settings_page.dart
++++ b/splitmarket/lib/features/settings/views/settings_page.dart
+@@ -208,7 +208,7 @@ class SettingsPage extends StatelessWidget {
+           ),
+         ],
+       ),
+-      bottomNavigationBar: const CustomBottomNavbar(currentIndex: 3),
++      bottomNavigationBar: const CustomBottomNavbar(currentIndex: 4),
+     );
+   }
+ 
+diff --git a/splitmarket/macos/Flutter/GeneratedPluginRegistrant.swift b/splitmarket/macos/Flutter/GeneratedPluginRegistrant.swift
+index 845dea4..874ce3f 100644
+--- a/splitmarket/macos/Flutter/GeneratedPluginRegistrant.swift
++++ b/splitmarket/macos/Flutter/GeneratedPluginRegistrant.swift
+@@ -6,18 +6,22 @@ import FlutterMacOS
+ import Foundation
+ 
+ import cloud_firestore
++import file_picker
+ import file_selector_macos
+ import firebase_auth
+ import firebase_core
++import firebase_storage
+ import geolocator_apple
+ import shared_preferences_foundation
+ import sqflite_darwin
+ 
+ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
+   FLTFirebaseFirestorePlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseFirestorePlugin"))
++  FilePickerPlugin.register(with: registry.registrar(forPlugin: "FilePickerPlugin"))
+   FileSelectorPlugin.register(with: registry.registrar(forPlugin: "FileSelectorPlugin"))
+   FLTFirebaseAuthPlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseAuthPlugin"))
+   FLTFirebaseCorePlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseCorePlugin"))
++  FLTFirebaseStoragePlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseStoragePlugin"))
+   GeolocatorPlugin.register(with: registry.registrar(forPlugin: "GeolocatorPlugin"))
+   SharedPreferencesPlugin.register(with: registry.registrar(forPlugin: "SharedPreferencesPlugin"))
+   SqflitePlugin.register(with: registry.registrar(forPlugin: "SqflitePlugin"))
+diff --git a/splitmarket/pubspec.lock b/splitmarket/pubspec.lock
+index 0d3efab..69ee55f 100644
+--- a/splitmarket/pubspec.lock
++++ b/splitmarket/pubspec.lock
+@@ -9,6 +9,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.3.59"
++  args:
++    dependency: transitive
++    description:
++      name: args
++      sha256: d0481093c50b1da8910eb0bb301626d4d8eb7284aa739614d2b394ee09e3ea04
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.7.0"
+   async:
+     dependency: transitive
+     description:
+@@ -113,6 +121,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.2.0"
++  dbus:
++    dependency: transitive
++    description:
++      name: dbus
++      sha256: "0ce9b0a839e6dee59a37a623d2fc26a35bbbe6404213e419b0d6411023d62645"
++      url: "https://pub.dev"
++    source: hosted
++    version: "0.7.14"
+   fake_async:
+     dependency: transitive
+     description:
+@@ -137,6 +153,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "7.0.1"
++  file_picker:
++    dependency: "direct main"
++    description:
++      name: file_picker
++      sha256: "57d9a1dd5063f85fa3107fb42d1faffda52fdc948cefd5fe5ea85267a5fc7343"
++      url: "https://pub.dev"
++    source: hosted
++    version: "10.3.10"
+   file_selector_linux:
+     dependency: transitive
+     description:
+@@ -217,6 +241,30 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "2.24.1"
++  firebase_storage:
++    dependency: "direct main"
++    description:
++      name: firebase_storage
++      sha256: "958fc88a7ef0b103e694d30beed515c8f9472dde7e8459b029d0e32b8ff03463"
++      url: "https://pub.dev"
++    source: hosted
++    version: "12.4.10"
++  firebase_storage_platform_interface:
++    dependency: transitive
++    description:
++      name: firebase_storage_platform_interface
++      sha256: d2661c05293c2a940c8ea4bc0444e1b5566c79dd3202c2271140c082c8cd8dd4
++      url: "https://pub.dev"
++    source: hosted
++    version: "5.2.10"
++  firebase_storage_web:
++    dependency: transitive
++    description:
++      name: firebase_storage_web
++      sha256: "629a557c5e1ddb97a3666cbf225e97daa0a66335dbbfdfdce113ef9f881e833f"
++      url: "https://pub.dev"
++    source: hosted
++    version: "3.10.17"
+   fixnum:
+     dependency: transitive
+     description:
+@@ -616,6 +664,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "2.3.0"
++  petitparser:
++    dependency: transitive
++    description:
++      name: petitparser
++      sha256: "91bd59303e9f769f108f8df05e371341b15d59e995e6806aefab827b58336675"
++      url: "https://pub.dev"
++    source: hosted
++    version: "7.0.2"
+   platform:
+     dependency: transitive
+     description:
+@@ -893,6 +949,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.1.1"
++  win32:
++    dependency: transitive
++    description:
++      name: win32
++      sha256: d7cb55e04cd34096cd3a79b3330245f54cb96a370a1c27adb3c84b917de8b08e
++      url: "https://pub.dev"
++    source: hosted
++    version: "5.15.0"
+   wkt_parser:
+     dependency: transitive
+     description:
+@@ -909,6 +973,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.1.0"
++  xml:
++    dependency: transitive
++    description:
++      name: xml
++      sha256: "971043b3a0d3da28727e40ed3e0b5d18b742fa5a68665cca88e74b7876d5e025"
++      url: "https://pub.dev"
++    source: hosted
++    version: "6.6.1"
+   yaml:
+     dependency: transitive
+     description:
+diff --git a/splitmarket/pubspec.yaml b/splitmarket/pubspec.yaml
+index 232fc3b..91567e3 100644
+--- a/splitmarket/pubspec.yaml
++++ b/splitmarket/pubspec.yaml
+@@ -8,13 +8,16 @@ environment:
+   sdk: ">=3.11.0 <4.0.0"
+ 
+ dependencies:
++  
+   flutter:
+     sdk: flutter
+-  
++
++  file_picker: ^10.3.2
+   # Firebase - VERSÕES CORRETAS
+   firebase_core: ^3.8.0
+   firebase_auth: ^5.3.3
+   cloud_firestore: ^5.4.0
++  firebase_storage: ^12.3.0
+   
+   # Outras dependências
+   shared_preferences: ^2.2.3
+diff --git a/splitmarket/windows/flutter/generated_plugin_registrant.cc b/splitmarket/windows/flutter/generated_plugin_registrant.cc
+index 8726002..a9a7077 100644
+--- a/splitmarket/windows/flutter/generated_plugin_registrant.cc
++++ b/splitmarket/windows/flutter/generated_plugin_registrant.cc
+@@ -10,6 +10,7 @@
+ #include <file_selector_windows/file_selector_windows.h>
+ #include <firebase_auth/firebase_auth_plugin_c_api.h>
+ #include <firebase_core/firebase_core_plugin_c_api.h>
++#include <firebase_storage/firebase_storage_plugin_c_api.h>
+ #include <geolocator_windows/geolocator_windows.h>
+ 
+ void RegisterPlugins(flutter::PluginRegistry* registry) {
+@@ -21,6 +22,8 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
+       registry->GetRegistrarForPlugin("FirebaseAuthPluginCApi"));
+   FirebaseCorePluginCApiRegisterWithRegistrar(
+       registry->GetRegistrarForPlugin("FirebaseCorePluginCApi"));
++  FirebaseStoragePluginCApiRegisterWithRegistrar(
++      registry->GetRegistrarForPlugin("FirebaseStoragePluginCApi"));
+   GeolocatorWindowsRegisterWithRegistrar(
+       registry->GetRegistrarForPlugin("GeolocatorWindows"));
+ }
+diff --git a/splitmarket/windows/flutter/generated_plugins.cmake b/splitmarket/windows/flutter/generated_plugins.cmake
+index 55841aa..9f22662 100644
+--- a/splitmarket/windows/flutter/generated_plugins.cmake
++++ b/splitmarket/windows/flutter/generated_plugins.cmake
+@@ -7,6 +7,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
+   file_selector_windows
+   firebase_auth
+   firebase_core
++  firebase_storage
+   geolocator_windows
+ )
+ 
