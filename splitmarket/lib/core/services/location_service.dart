@@ -41,34 +41,44 @@ class LocationService {
   }
 
   Future<String> getAddressFromCoordinates(
-    double latitude,
-    double longitude,
-  ) async {
+  double latitude,
+  double longitude,
+) async {
+  try {
+    List<Placemark> placemarks =
+        await placemarkFromCoordinates(
+      latitude,
+      longitude,
+    );
 
-    try {
+    if (placemarks.isNotEmpty) {
+      final place = placemarks.first;
 
-      List<Placemark> placemarks =
-          await placemarkFromCoordinates(
-        latitude,
-        longitude,
-      );
+      final rua = place.street ?? '';
+      final bairro = place.subLocality ?? '';
+      final cidade = place.locality ?? '';
+      final estado = place.administrativeArea ?? '';
 
-      if (placemarks.isNotEmpty) {
+      final endereco = [
+        rua,
+        bairro,
+        cidade,
+        estado,
+      ]
+          .where((item) => item.isNotEmpty)
+          .join(', ');
 
-        final place = placemarks.first;
-
-        return
-            '${place.street}, '
-            '${place.subLocality}, '
-            '${place.locality} - '
-            '${place.administrativeArea}';
-      }
-
-      return 'Endereço não encontrado';
-
-    } catch (e) {
-
-      return 'Erro ao buscar endereço';
+      return endereco.isNotEmpty
+          ? endereco
+          : 'Endereço não encontrado';
     }
+
+    return 'Endereço não encontrado';
+  } catch (e) {
+    print('ERRO CODING: $e');
+
+    return '${latitude.toStringAsFixed(6)}, '
+           '${longitude.toStringAsFixed(6)}';
   }
+}
 }

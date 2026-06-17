@@ -1,4 +1,6 @@
 // lib/models/user_model.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class UserModel {
   final String id;           // UID do Firebase Auth
   final String email;
@@ -16,7 +18,9 @@ class UserModel {
     this.lastLogin,
   });
   
-  // Converter para Map (para salvar no Firestore)
+  // ============================================================
+  // ✅ TO MAP - Para salvar no Firestore
+  // ============================================================
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -28,21 +32,44 @@ class UserModel {
     };
   }
   
-  // Criar UserModel a partir do Firestore
+  // ============================================================
+  // ✅ FROM MAP - CORRIGIDO para aceitar diferentes tipos
+  // ============================================================
   factory UserModel.fromMap(String id, Map<String, dynamic> map) {
     return UserModel(
       id: id,
-      email: map['email'] ?? '',
-      name: map['name'] ?? '',
-      avatar: map['avatar'],
-      createdAt: DateTime.parse(map['createdAt']),
-      lastLogin: map['lastLogin'] != null 
-          ? DateTime.parse(map['lastLogin']) 
-          : null,
+      email: _toString(map['email']) ?? '',
+      name: _toString(map['name']) ?? '',
+      avatar: _toString(map['avatar']),
+      createdAt: _toDateTime(map['createdAt']) ?? DateTime.now(),
+      lastLogin: _toDateTime(map['lastLogin']),
     );
   }
   
-  // Cópia com modificações
+  // ============================================================
+  // ✅ TO JSON - Para APIs
+  // ============================================================
+  Map<String, dynamic> toJson() {
+    return toMap();
+  }
+  
+  // ============================================================
+  // ✅ FROM JSON - Para APIs
+  // ============================================================
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: _toString(json['id']) ?? '',
+      email: _toString(json['email']) ?? '',
+      name: _toString(json['name']) ?? '',
+      avatar: _toString(json['avatar']),
+      createdAt: _toDateTime(json['createdAt']) ?? DateTime.now(),
+      lastLogin: _toDateTime(json['lastLogin']),
+    );
+  }
+  
+  // ============================================================
+  // ✅ COPY WITH
+  // ============================================================
   UserModel copyWith({
     String? id,
     String? email,
@@ -59,5 +86,33 @@ class UserModel {
       createdAt: createdAt ?? this.createdAt,
       lastLogin: lastLogin ?? this.lastLogin,
     );
+  }
+
+  // ============================================================
+  // ✅ MÉTODOS AUXILIARES PARA CONVERSÃO SEGURA
+  // ============================================================
+  
+  /// Converte qualquer valor para String
+  static String? _toString(dynamic value) {
+    if (value == null) return null;
+    return value.toString();
+  }
+
+  /// Converte qualquer valor para DateTime
+  static DateTime? _toDateTime(dynamic value) {
+    if (value == null) return null;
+    
+    // Se for Timestamp (Firestore)
+    if (value is Timestamp) return value.toDate();
+    
+    // Se for DateTime
+    if (value is DateTime) return value;
+    
+    // Se for String
+    if (value is String) {
+      return DateTime.tryParse(value);
+    }
+    
+    return null;
   }
 }

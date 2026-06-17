@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -81,7 +82,7 @@ class _SplitMarketAppState extends State<SplitMarketApp> {
         isLoading = false;
       });
     } catch (e) {
-      print('Erro ao verificar login: $e');
+      debugPrint('Erro ao verificar login: $e');
       setState(() {
         isLogged = false;
         isLoading = false;
@@ -106,10 +107,35 @@ class _SplitMarketAppState extends State<SplitMarketApp> {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'SplitMarket',
+          
+          // ============================================================
+          // ✅ SUPORTE A PORTUGUÊS (TalkBack em PT-BR)
+          // ============================================================
+          locale: const Locale('pt', 'BR'),
+          localizationsDelegates: [
+            GlobalMaterialLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate, // ✅ Substitui GlobalWidgetsLocalizations
+          ],
+          supportedLocales: const [
+            Locale('pt', 'BR'),
+            Locale('en', 'US'),
+          ],
+          
+          // ============================================================
+          // ✅ TEMAS
+          // ============================================================
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeNotifier.currentTheme,
+          
+          // ============================================================
+          // ✅ TELA INICIAL
+          // ============================================================
           home: isLogged ? const HomePage() : const LoginPage(),
+          
+          // ============================================================
+          // ✅ ROTAS
+          // ============================================================
           routes: {
             '/login': (context) => const LoginPage(),
             '/register': (context) => const RegisterPage(),
