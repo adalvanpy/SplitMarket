@@ -1,4 +1,4 @@
-/// lib/shared/widgets/custom_bottom_navbar.dart
+/// lib/shared/widgets/custom_buttom_navbar.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:provider/provider.dart';
@@ -50,31 +50,31 @@ class CustomBottomNavbar extends StatelessWidget {
             if (index == currentIndex) return;
 
             final routes = [
-              '/home',        // Dashboard
-              '/expenses',    // Despesas
-              '/invite',      //convite
-              '/group',       // Grupos
-              '/settings',    // Configurações
+              '/home',        // 0 - Dashboard
+              '/expenses',    // 1 - Despesas
+              '/invites',     // 2 - Convites
+              '/group',       // 3 - Grupos
+              '/settings',    // 4 - Configurações
             ];
 
             final labels = [
               'Dashboard',
               'Despesas',
-              'Convites'
+              'Convites',
               'Grupos',
               'Configurações',
             ];
 
-            // 🗣️ Anúncio de navegação
             SemanticsService.announce(
               'Navegando para ${labels[index]}',
               Directionality.of(context),
             );
+            
 
             Navigator.pushReplacementNamed(context, routes[index]);
           },
           items: [
-            // 📊 Dashboard
+            // 0 - Dashboard
             BottomNavigationBarItem(
               icon: Semantics(
                 label: 'Dashboard',
@@ -86,8 +86,8 @@ class CustomBottomNavbar extends StatelessWidget {
               ),
               label: 'Dashboard',
             ),
-            
-            // 📝 Despesas
+
+            // 1 - Despesas
             BottomNavigationBarItem(
               icon: Semantics(
                 label: 'Despesas',
@@ -99,8 +99,21 @@ class CustomBottomNavbar extends StatelessWidget {
               ),
               label: 'Despesas',
             ),
-            
-            // 👥 Grupos
+
+            // 2 - Convites
+            BottomNavigationBarItem(
+              icon: Semantics(
+                label: 'Convites',
+                hint: 'Toque para ver seus convites',
+                child: ExcludeSemantics(
+                  excluding: true,
+                  child: const Icon(Icons.mail_outline),
+                ),
+              ),
+              label: 'Convites',
+            ),
+
+            // 3 - Grupos
             BottomNavigationBarItem(
               icon: Semantics(
                 label: 'Grupos',
@@ -112,57 +125,61 @@ class CustomBottomNavbar extends StatelessWidget {
               ),
               label: 'Grupos',
             ),
-            
-            // ⚙️ Configurações com badge
-            BottomNavigationBarItem(
-              icon: Semantics(
-                label: 'Configurações',
-                hint: 'Toque para ir para Configurações',
-                child: FutureBuilder<String>(
-                  future: PreferencesService.getUserName(),
-                  builder: (context, snapshot) {
-                    final currentUser = snapshot.data ?? 'Usuário';
-                    return Consumer<NotificationProvider>(
-                      builder: (context, notificationProvider, child) {
-                        final hasPending = notificationProvider.hasPendingFor(currentUser);
-                        final pendingCount = notificationProvider.pendingCountFor(currentUser);
-                        
-                        return Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            ExcludeSemantics(
-                              excluding: true,
-                              child: const Icon(Icons.settings_outlined),
-                            ),
-                            if (hasPending)
-                              Semantics(
-                                label: '$pendingCount notificações pendentes',
-                                child: Positioned(
-                                  top: -2,
-                                  right: -2,
-                                  child: Container(
-                                    width: 10,
-                                    height: 10,
-                                    decoration: BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Theme.of(context).cardColor,
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        );
-                      },
-                    );
-                  },
-                ),
+
+            // 4 - Configurações com badge
+           BottomNavigationBarItem(
+  icon: FutureBuilder<String>(
+    future: PreferencesService.getUserName(),
+    builder: (context, snapshot) {
+      final currentUser = snapshot.data ?? 'Usuário';
+
+      return Consumer<NotificationProvider>(
+        builder: (context, notificationProvider, child) {
+          final hasPending =
+              notificationProvider.hasPendingFor(currentUser);
+          final pendingCount =
+              notificationProvider.pendingCountFor(currentUser);
+
+          return Semantics(
+            label: hasPending
+                ? 'Configurações, $pendingCount notificações pendentes'
+                : 'Configurações',
+            hint: 'Toque para ir para Configurações',
+            button: true,
+            selected: currentIndex == 4,
+            child: ExcludeSemantics(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.settings_outlined),
+                  if (hasPending)
+                    Positioned(
+                      top: -2,
+                      right: -2,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Theme.of(context).cardColor,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              label: 'Configurações',
             ),
+          );
+        },
+      );
+    },
+  ),
+  label: 'Configurações',
+
+),
           ],
         ),
       ),
