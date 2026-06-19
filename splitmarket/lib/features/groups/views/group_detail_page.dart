@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/services/expense_service.dart';
 import '../../../data/models/group_model.dart';
 import '../../../data/models/expense_model.dart';
@@ -10,7 +10,6 @@ import '../../../shared/widgets/custom_buttom_navbar.dart';
 
 class GroupDetailPage extends StatefulWidget {
   final GroupModel grupo;
-
   const GroupDetailPage({
     super.key,
     required this.grupo,
@@ -24,11 +23,10 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
   final ExpenseService _expenseService = ExpenseService();
   late Future<List<ExpenseModel>> _despesasFuture;
   bool _showParticipants = false;
-  
-  Map<String, String> _userNames = {};
+  final Map<String, String> _userNames = {};
   bool _loadingNames = true;
+  bool _saindoDoGrupo = false;
 
-  // 🎯 Focus nodes
   final FocusNode _addExpenseFocusNode = FocusNode();
   final FocusNode _toggleMembersFocusNode = FocusNode();
 
@@ -46,29 +44,22 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     super.dispose();
   }
 
-  // 🗣️ Método para anunciar ao TalkBack
   void _announceToTalkBack(String message) {
     if (mounted) {
-      SemanticsService.announce(
-        message,
-        Directionality.of(context),
-      );
+      SemanticsService.announce(message, Directionality.of(context));
     }
   }
 
   Future<void> _loadUserNames() async {
     setState(() => _loadingNames = true);
-    
     try {
       for (String userId in widget.grupo.membros) {
         final doc = await FirebaseFirestore.instance
             .collection('users')
             .doc(userId)
             .get();
-        
         if (doc.exists) {
-          final nome = doc.data()?['name'] ?? userId;
-          _userNames[userId] = nome;
+          _userNames[userId] = doc.data()?['name'] ?? userId;
         } else {
           _userNames[userId] = userId;
         }
@@ -80,53 +71,126 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     }
   }
 
-  String _getUserName(String userId) {
-    return _userNames[userId] ?? userId;
-  }
+  String _getUserName(String userId) => _userNames[userId] ?? userId;
 
   void _loadDespesas() {
     _despesasFuture = _expenseService.getExpensesByGroup(widget.grupo.id);
   }
 
-  double _calcularTotalPago(List<ExpenseModel> despesas) {
-    return despesas.fold(0.0, (sum, expense) => sum + expense.value);
-  }
+  // ============================================================
+  // SAIR DO GRUPO
+  // ============================================================
+  Future<void> _sairDoGrupo() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
 
-  Map<String, double> _calcularDividasParticipante(List<ExpenseModel> despesas) {
-    final dividas = <String, double>{};
+    // Verifica dívidas pendentes
+    final despesas = await _expenseService.getExpensesByGroup(widget.grupo.id);
+    final userName = _getUserName(uid);
 
-    for (String membro in widget.grupo.membros) {
-      final nomeMembro = _getUserName(membro);
-      dividas[nomeMembro] = 0.0;
-    }
-
+    double totalDevendo = 0;
     for (final expense in despesas) {
-      final valorPorPessoa = expense.value / widget.grupo.membros.length;
-      for (String membro in widget.grupo.membros) {
-        if (membro != expense.payer) {
-          final nomeMembro = _getUserName(membro);
-          dividas[nomeMembro] = (dividas[nomeMembro] ?? 0.0) + valorPorPessoa;
-        }
+      if (expense.payer != uid) {
+        final share = expense.value / widget.grupo.membros.length;
+        totalDevendo += share;
       }
     }
 
-    return dividas;
+    double totalAReceber = 0;
+    for (final expense in despesas) {
+      if (expense.payer == uid) {
+        final share = expense.value / widget.grupo.membros.length;
+        totalAReceber += share * (widget.grupo.membros.length - 1);
+      }
+    }
+
+    if (!mounted) return;
+
+    if (totalDevendo > 0 || totalAReceber > 0) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Não é possível sair'),
+          content: Text(
+            totalDevendo > 0
+                ? 'Você possui R\$ ${totalDevendo.toStringAsFixed(2)} em dívidas pendentes neste grupo. Quite-as antes de sair.'
+                : 'Você possui R\$ ${totalAReceber.toStringAsFixed(2)} a receber neste grupo. Resolva as pendências antes de sair.',
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Confirma saída
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sair do grupo'),
+        content: Text(
+          'Tem certeza que deseja sair do grupo "${widget.grupo.nome}"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sair'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _saindoDoGrupo = true);
+
+    try {
+      final groupRef = FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.grupo.id);
+
+      final groupDoc = await groupRef.get();
+      final membros = List<String>.from(groupDoc['membros']);
+      membros.remove(uid);
+
+      await groupRef.update({'membros': membros});
+
+      if (!mounted) return;
+      _announceToTalkBack('Você saiu do grupo ${widget.grupo.nome}');
+      Navigator.pop(context, true); // volta para a lista de grupos
+    } catch (e) {
+      debugPrint('Erro ao sair do grupo: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao sair do grupo: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _saindoDoGrupo = false);
+    }
   }
 
   void _toggleParticipantes() {
     setState(() {
       _showParticipants = !_showParticipants;
-      if (_showParticipants) {
-        _announceToTalkBack('Lista de participantes aberta');
-      } else {
-        _announceToTalkBack('Lista de participantes fechada');
-      }
+      _announceToTalkBack(
+        _showParticipants
+            ? 'Lista de participantes aberta'
+            : 'Lista de participantes fechada',
+      );
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // 🔤 Fonte dinâmica
     final textScale = MediaQuery.of(context).textScaleFactor;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -149,8 +213,9 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
           actions: [
             Semantics(
               button: true,
-              label: _showParticipants ? 'Fechar lista de membros' : 'Abrir lista de membros',
-              hint: _showParticipants ? 'Toque para fechar' : 'Toque para ver os membros do grupo',
+              label: _showParticipants
+                  ? 'Fechar lista de membros'
+                  : 'Abrir lista de membros',
               child: TextButton.icon(
                 focusNode: _toggleMembersFocusNode,
                 onPressed: _toggleParticipantes,
@@ -161,12 +226,32 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                 ),
                 label: Text(
                   _showParticipants ? 'Fechar' : 'Membros',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14 * textScale,
-                  ),
+                  style: TextStyle(color: Colors.white, fontSize: 14 * textScale),
                 ),
               ),
+            ),
+            // Botão Sair do Grupo
+            Semantics(
+              button: true,
+              label: 'Sair do grupo',
+              hint: 'Toque para sair deste grupo',
+              child: _saindoDoGrupo
+                  ? const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      ),
+                    )
+                  : IconButton(
+                      icon: const Icon(Icons.exit_to_app, color: Colors.white),
+                      tooltip: 'Sair do grupo',
+                      onPressed: _sairDoGrupo,
+                    ),
             ),
           ],
         ),
@@ -175,7 +260,8 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
             FutureBuilder<List<ExpenseModel>>(
               future: _despesasFuture,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting || _loadingNames) {
+                if (snapshot.connectionState == ConnectionState.waiting ||
+                    _loadingNames) {
                   return Center(
                     child: Semantics(
                       label: 'Carregando despesas do grupo',
@@ -183,23 +269,15 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                     ),
                   );
                 }
-
                 if (snapshot.hasError) {
                   return Center(
-                    child: Semantics(
-                      label: 'Erro ao carregar despesas',
-                      child: Text(
-                        'Erro ao carregar despesas: ${snapshot.error}',
-                        style: TextStyle(
-                          fontSize: 16 * textScale,
-                        ),
-                      ),
+                    child: Text(
+                      'Erro ao carregar despesas: ${snapshot.error}',
+                      style: TextStyle(fontSize: 16 * textScale),
                     ),
                   );
                 }
-
                 final despesas = snapshot.data ?? [];
-
                 return SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -207,23 +285,14 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                     children: [
                       _buildGroupHeader(context, isDark, textScale),
                       const SizedBox(height: 16),
-                      
                       _buildActionButtons(context, textScale),
                       const SizedBox(height: 24),
-                      
-                      _buildDespesasSection(
-                        context,
-                        despesas,
-                        isDark,
-                        textScale,
-                      ),
+                      _buildDespesasSection(context, despesas, isDark, textScale),
                     ],
                   ),
                 );
               },
             ),
-            
-            // Sidebar de participantes
             AnimatedPositioned(
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeInOut,
@@ -233,20 +302,17 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
               width: 280,
               child: _buildParticipantsSidebar(context, isDark, textScale),
             ),
-            
             if (_showParticipants)
               GestureDetector(
                 onTap: _toggleParticipantes,
                 child: Semantics(
                   label: 'Fechar lista de participantes',
-                  child: Container(
-                    color: Colors.black.withOpacity(0.3),
-                  ),
+                  child: Container(color: Colors.black.withOpacity(0.3)),
                 ),
               ),
           ],
         ),
-        bottomNavigationBar: const CustomBottomNavbar(currentIndex: 2),
+        bottomNavigationBar: const CustomBottomNavbar(currentIndex: 3),
       ),
     );
   }
@@ -254,11 +320,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
   // ============================================================
   // HEADER DO GRUPO
   // ============================================================
-  Widget _buildGroupHeader(
-    BuildContext context,
-    bool isDark,
-    double textScale,
-  ) {
+  Widget _buildGroupHeader(BuildContext context, bool isDark, double textScale) {
     return Semantics(
       container: true,
       label: 'Informações do grupo ${widget.grupo.nome}',
@@ -290,11 +352,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
-                  Icons.group,
-                  color: Colors.white,
-                  size: 24,
-                ),
+                child: const Icon(Icons.group, color: Colors.white, size: 24),
               ),
             ),
             const SizedBox(width: 12),
@@ -338,10 +396,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
   // ============================================================
   // BOTÕES DE AÇÃO
   // ============================================================
-  Widget _buildActionButtons(
-    BuildContext context,
-    double textScale,
-  ) {
+  Widget _buildActionButtons(BuildContext context, double textScale) {
     return Semantics(
       button: true,
       label: 'Nova despesa',
@@ -370,12 +425,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
             _announceToTalkBack('Lista de despesas atualizada');
           },
           icon: const Icon(Icons.add, size: 20),
-          label: Text(
-            'Nova despesa',
-            style: TextStyle(
-              fontSize: 15 * textScale,
-            ),
-          ),
+          label: Text('Nova despesa', style: TextStyle(fontSize: 15 * textScale)),
         ),
       ),
     );
@@ -385,10 +435,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
   // SIDEBAR DE PARTICIPANTES
   // ============================================================
   Widget _buildParticipantsSidebar(
-    BuildContext context,
-    bool isDark,
-    double textScale,
-  ) {
+      BuildContext context, bool isDark, double textScale) {
     return Semantics(
       container: true,
       label: 'Lista de participantes do grupo',
@@ -402,7 +449,8 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
               bottomRight: Radius.circular(24),
             ),
           ),
-          padding: const EdgeInsets.only(top: 48, left: 16, right: 16, bottom: 16),
+          padding: const EdgeInsets.only(
+              top: 48, left: 16, right: 16, bottom: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -424,7 +472,6 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                   Semantics(
                     button: true,
                     label: 'Fechar lista',
-                    hint: 'Toque para fechar a lista de participantes',
                     child: IconButton(
                       onPressed: _toggleParticipantes,
                       icon: const Icon(Icons.close, size: 20),
@@ -441,61 +488,65 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                           child: const CircularProgressIndicator(),
                         ),
                       )
-                    : Semantics(
-                        label: '${widget.grupo.membros.length} participantes',
-                        child: ListView.separated(
-                          itemCount: widget.grupo.membros.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
-                            final membroId = widget.grupo.membros[index];
-                            final membroNome = _getUserName(membroId);
-                            final inicial = membroNome.trim().isNotEmpty
-                                ? membroNome.trim()[0].toUpperCase()
-                                : '?';
-                            return Semantics(
-                              container: true,
-                              label: 'Participante ${index + 1}: $membroNome',
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).cardColor,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isDark ? Colors.white12 : Colors.grey.shade200,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 18,
-                                      backgroundColor: const Color(0xFF8E76F7),
-                                      child: Text(
-                                        inicial,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14 * textScale,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        membroNome,
-                                        style: TextStyle(
-                                          fontSize: 14 * textScale,
-                                          fontWeight: FontWeight.w500,
-                                          color: isDark ? Colors.white : Colors.black87,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
+                    : ListView.separated(
+                        itemCount: widget.grupo.membros.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final membroId = widget.grupo.membros[index];
+                          final membroNome = _getUserName(membroId);
+                          final inicial = membroNome.trim().isNotEmpty
+                              ? membroNome.trim()[0].toUpperCase()
+                              : '?';
+                          return Semantics(
+                            container: true,
+                            label: 'Participante ${index + 1}: $membroNome',
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).cardColor,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isDark
+                                      ? Colors.white12
+                                      : Colors.grey.shade200,
                                 ),
                               ),
-                            );
-                          },
-                        ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor:
+                                        const Color(0xFF8E76F7),
+                                    child: Text(
+                                      inicial,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14 * textScale,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      membroNome,
+                                      style: TextStyle(
+                                        fontSize: 14 * textScale,
+                                        fontWeight: FontWeight.w500,
+                                        color: isDark
+                                            ? Colors.white
+                                            : Colors.black87,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
               ),
             ],
@@ -533,31 +584,20 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
         if (despesas.isEmpty)
           _buildEmptyState(isDark, textScale)
         else
-          Semantics(
-            label: 'Lista de despesas, ${despesas.length} itens',
-            child: ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: despesas.length,
-              itemBuilder: (context, index) {
-                final expense = despesas[index];
-                return _buildExpenseCard(
-                  context,
-                  expense,
-                  isDark,
-                  textScale,
-                  index,
-                );
-              },
-            ),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: despesas.length,
+            itemBuilder: (context, index) {
+              final expense = despesas[index];
+              return _buildExpenseCard(
+                  context, expense, isDark, textScale, index);
+            },
           ),
       ],
     );
   }
 
-  // ============================================================
-  // ESTADO VAZIO
-  // ============================================================
   Widget _buildEmptyState(bool isDark, double textScale) {
     return Center(
       child: Semantics(
@@ -583,14 +623,13 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                 ),
               ),
               const SizedBox(height: 8),
-              Semantics(
-                label: 'Toque no botão Nova despesa para adicionar',
-                child: Text(
-                  'Toque em "Nova despesa" para começar',
-                  style: TextStyle(
-                    fontSize: 12 * textScale,
-                    color: isDark ? Colors.white.withOpacity(0.4) : Colors.grey.shade500,
-                  ),
+              Text(
+                'Toque em "Nova despesa" para começar',
+                style: TextStyle(
+                  fontSize: 12 * textScale,
+                  color: isDark
+                      ? Colors.white.withOpacity(0.4)
+                      : Colors.grey.shade500,
                 ),
               ),
             ],
@@ -600,9 +639,6 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     );
   }
 
-  // ============================================================
-  // CARD DE DESPESA
-  // ============================================================
   Widget _buildExpenseCard(
     BuildContext context,
     ExpenseModel expense,
@@ -615,7 +651,8 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
 
     return Semantics(
       container: true,
-      label: 'Despesa ${index + 1}: ${expense.description}, valor R\$ ${expense.value.toStringAsFixed(2)}',
+      label:
+          'Despesa ${index + 1}: ${expense.description}, valor R\$ ${expense.value.toStringAsFixed(2)}',
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(14),
@@ -623,7 +660,9 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
           color: isDark ? const Color(0xFF2D2D2D) : Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isDark ? Colors.white.withOpacity(0.4) : Colors.grey.shade200,
+            color: isDark
+                ? Colors.white.withOpacity(0.4)
+                : Colors.grey.shade200,
           ),
         ),
         child: Column(
@@ -636,40 +675,32 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Semantics(
-                        label: 'Descrição: ${expense.description}',
-                        child: Text(
-                          expense.description,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14 * textScale,
-                            color: isDark ? Colors.white : Colors.black87,
-                          ),
+                      Text(
+                        expense.description,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14 * textScale,
+                          color: isDark ? Colors.white : Colors.black87,
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Semantics(
-                        label: 'Pago por: $payerName',
-                        child: Text(
-                          'Pago por: $payerName',
-                          style: TextStyle(
-                            fontSize: 12 * textScale,
-                            color: isDark ? Colors.white60 : Colors.grey.shade600,
-                          ),
+                      Text(
+                        'Pago por: $payerName',
+                        style: TextStyle(
+                          fontSize: 12 * textScale,
+                          color:
+                              isDark ? Colors.white60 : Colors.grey.shade600,
                         ),
                       ),
                     ],
                   ),
                 ),
-                Semantics(
-                  label: 'Valor: R\$ ${expense.value.toStringAsFixed(2)}',
-                  child: Text(
-                    'R\$ ${expense.value.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14 * textScale,
-                      color: const Color(0xFF8E76F7),
-                    ),
+                Text(
+                  'R\$ ${expense.value.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14 * textScale,
+                    color: const Color(0xFF8E76F7),
                   ),
                 ),
               ],
@@ -677,46 +708,36 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
             const SizedBox(height: 12),
             const Divider(height: 1),
             const SizedBox(height: 10),
-            Semantics(
-              label: 'Divisão da despesa',
-              child: Text(
-                'Divisão',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12 * textScale,
-                  color: isDark ? Colors.white70 : Colors.grey.shade700,
-                ),
+            Text(
+              'Divisão',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12 * textScale,
+                color: isDark ? Colors.white70 : Colors.grey.shade700,
               ),
             ),
             const SizedBox(height: 6),
             ...widget.grupo.membros.map((membro) {
               final nome = _getUserName(membro);
               if (membro == expense.payer) {
-                final payerNet = (expense.value - valorPorPessoa);
+                final payerNet = expense.value - valorPorPessoa;
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 3),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Semantics(
-                        label: nome,
-                        child: Text(
-                          nome,
+                      Text(nome,
                           style: TextStyle(
-                            fontSize: 12 * textScale,
-                            color: isDark ? Colors.white60 : Colors.grey.shade600,
-                          ),
-                        ),
-                      ),
-                      Semantics(
-                        label: 'Recebe R\$ ${payerNet.toStringAsFixed(2)}',
-                        child: Text(
-                          'R\$ ${payerNet.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12 * textScale,
-                            color: Colors.green.shade600,
-                          ),
+                              fontSize: 12 * textScale,
+                              color: isDark
+                                  ? Colors.white60
+                                  : Colors.grey.shade600)),
+                      Text(
+                        'R\$ ${payerNet.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12 * textScale,
+                          color: Colors.green.shade600,
                         ),
                       ),
                     ],
@@ -728,32 +749,25 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Semantics(
-                        label: nome,
-                        child: Text(
-                          nome,
+                      Text(nome,
                           style: TextStyle(
-                            fontSize: 12 * textScale,
-                            color: isDark ? Colors.white60 : Colors.grey.shade600,
-                          ),
-                        ),
-                      ),
-                      Semantics(
-                        label: 'Paga R\$ ${valorPorPessoa.toStringAsFixed(2)}',
-                        child: Text(
-                          'R\$ ${valorPorPessoa.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12 * textScale,
-                            color: Colors.red.shade600,
-                          ),
+                              fontSize: 12 * textScale,
+                              color: isDark
+                                  ? Colors.white60
+                                  : Colors.grey.shade600)),
+                      Text(
+                        'R\$ ${valorPorPessoa.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12 * textScale,
+                          color: Colors.red.shade600,
                         ),
                       ),
                     ],
                   ),
                 );
               }
-            }).toList(),
+            }),
           ],
         ),
       ),

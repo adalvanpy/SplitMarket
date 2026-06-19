@@ -145,7 +145,7 @@ class InvitesPage extends StatelessWidget {
           );
         },
       ),
-       bottomNavigationBar: const CustomBottomNavbar(currentIndex: 0),
+       bottomNavigationBar: const CustomBottomNavbar(currentIndex: 2),
     );
   }
 }

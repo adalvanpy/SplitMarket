@@ -52,6 +52,7 @@ class CustomBottomNavbar extends StatelessWidget {
             final routes = [
               '/home',        // Dashboard
               '/expenses',    // Despesas
+              '/invite',      //convite
               '/group',       // Grupos
               '/settings',    // Configurações
             ];
@@ -59,6 +60,7 @@ class CustomBottomNavbar extends StatelessWidget {
             final labels = [
               'Dashboard',
               'Despesas',
+              'Convites'
               'Grupos',
               'Configurações',
             ];

@@ -28,6 +28,11 @@
 	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
+    <key>NSCameraUsageDescription</key>
+<string>Necessário para tirar foto de perfil</string>
+
+<key>NSPhotoLibraryUsageDescription</key>
+<string>Necessário para selecionar foto de perfil</string>
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
 		<key>UISceneConfigurations</key>

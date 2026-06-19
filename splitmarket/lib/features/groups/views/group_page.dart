@@ -31,12 +31,8 @@ class _GroupPageState extends State<GroupPage> {
   }
 
   void _announceToTalkBack(String message) {
-    if (mounted) {
-      SemanticsService.announce(
-        message,
-        Directionality.of(context),
-      );
-    }
+    if (!mounted) return;
+    SemanticsService.announce(message, Directionality.of(context));
   }
 
   @override
@@ -107,7 +103,7 @@ class _GroupPageState extends State<GroupPage> {
             child: const Icon(Icons.add),
           ),
         ),
-        bottomNavigationBar: const CustomBottomNavbar(currentIndex: 2),
+        bottomNavigationBar: const CustomBottomNavbar(currentIndex: 3),
       ),
     );
   }
@@ -179,9 +175,6 @@ class _GroupPageState extends State<GroupPage> {
     );
   }
 
-  // ============================================================
-  // CARD DO GRUPO - CORRIGIDO ✅
-  // ============================================================
   Widget _buildGroupCard(
     BuildContext context,
     dynamic grupo,
@@ -204,7 +197,6 @@ class _GroupPageState extends State<GroupPage> {
               ),
             );
           },
-          // ✅ CORRIGIDO: ExcludeSemantics em vez de Semantics
           leading: ExcludeSemantics(
             excluding: true,
             child: CircleAvatar(
@@ -235,7 +227,7 @@ class _GroupPageState extends State<GroupPage> {
           trailing: Semantics(
             button: true,
             label: 'Adicionar participante ao grupo ${grupo.nome}',
-            hint: 'Toque para adicionar um novo membro',
+            hint: 'Toque para enviar convite para um novo membro',
             child: IconButton(
               icon: const Icon(Icons.person_add),
               tooltip: 'Adicionar participante',
@@ -251,9 +243,6 @@ class _GroupPageState extends State<GroupPage> {
     );
   }
 
-  // ============================================================
-  // DIÁLOGO CRIAR GRUPO
-  // ============================================================
   void _mostrarDialogoCriarGrupo(BuildContext context) {
     final controller = TextEditingController();
     final FocusNode textFieldFocusNode = FocusNode();
@@ -335,6 +324,7 @@ class _GroupPageState extends State<GroupPage> {
       ),
     ).then((_) {
       textFieldFocusNode.dispose();
+      controller.dispose();
     });
   }
 
@@ -357,9 +347,9 @@ class _GroupPageState extends State<GroupPage> {
     try {
       await Provider.of<GroupProvider>(context, listen: false)
           .criarGrupo(nome.trim());
-      
+
       if (!mounted) return;
-      
+
       _announceToTalkBack('Grupo criado com sucesso');
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -374,7 +364,7 @@ class _GroupPageState extends State<GroupPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      
+
       final errorMessage = 'Erro ao criar grupo: $e';
       _announceToTalkBack(errorMessage);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -390,9 +380,6 @@ class _GroupPageState extends State<GroupPage> {
     }
   }
 
-  // ============================================================
-  // DIÁLOGO ADICIONAR PARTICIPANTE
-  // ============================================================
   void _mostrarDialogoAdicionarParticipante(
     BuildContext context,
     String grupoId,
@@ -442,6 +429,7 @@ class _GroupPageState extends State<GroupPage> {
                 _adicionarParticipante(
                   context,
                   grupoId,
+                  grupoNome,
                   controller.text,
                 );
               },
@@ -468,11 +456,12 @@ class _GroupPageState extends State<GroupPage> {
             Semantics(
               button: true,
               label: 'Adicionar participante',
-              hint: 'Confirmar adição do novo participante',
+              hint: 'Confirmar envio do convite',
               child: TextButton(
                 onPressed: () => _adicionarParticipante(
                   context,
                   grupoId,
+                  grupoNome,
                   controller.text,
                 ),
                 child: Text(
@@ -489,12 +478,14 @@ class _GroupPageState extends State<GroupPage> {
       ),
     ).then((_) {
       textFieldFocusNode.dispose();
+      controller.dispose();
     });
   }
 
   Future<void> _adicionarParticipante(
     BuildContext context,
     String grupoId,
+    String grupoNome,
     String email,
   ) async {
     if (email.trim().isEmpty) {
@@ -528,18 +519,21 @@ class _GroupPageState extends State<GroupPage> {
     }
 
     try {
-      await Provider.of<GroupProvider>(context, listen: false)
-          .adicionarParticipante(grupoId, email.trim());
-      
+      await Provider.of<GroupProvider>(context, listen: false).enviarConvite(
+        grupoId,
+        grupoNome,
+        email.trim(),
+      );
+
       if (!mounted) return;
-      
-      _announceToTalkBack('Participante adicionado com sucesso');
+
+      _announceToTalkBack('Convite enviado com sucesso');
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Semantics(
-            label: 'Participante adicionado com sucesso',
-            child: const Text('Participante adicionado com sucesso!'),
+            label: 'Convite enviado com sucesso',
+            child: const Text('Convite enviado com sucesso!'),
           ),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 3),
@@ -547,7 +541,7 @@ class _GroupPageState extends State<GroupPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      
+
       final errorMessage = 'Erro ao adicionar participante: $e';
       _announceToTalkBack(errorMessage);
       ScaffoldMessenger.of(context).showSnackBar(

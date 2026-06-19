@@ -6,7 +6,12 @@
     <!-- Localização -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+<<<<<<< Updated upstream
 
+=======
+    <uses-permission android:name="android.permission.CAMERA"/>
+    
+>>>>>>> Stashed changes
     <application
         android:label="splitmarket"
         android:name="${applicationName}"

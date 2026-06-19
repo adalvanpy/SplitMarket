@@ -68,7 +68,6 @@ class GroupProvider extends ChangeNotifier {
       
       // Também salvar via ApiService se necessário
       
-      
       print('✅ Grupo criado: ${grupoSalvo.nome} (ID: ${grupoSalvo.id})');
       
     } catch (e) {

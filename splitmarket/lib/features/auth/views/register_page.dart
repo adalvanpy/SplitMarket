@@ -160,90 +160,76 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    // 🔤 Fonte dinâmica - respeita configurações do sistema
-    final textScale = MediaQuery.of(context).textScaleFactor;
-    
-    return Semantics(
-      container: true,
-      label: 'Tela de cadastro de usuário',
-      child: Scaffold(
-        appBar: AppBar(
-          title: Semantics(
-            label: 'Tela de cadastro',
-            child: const Text('Cadastro'),
-          ),
-          automaticallyImplyLeading: false,
+Widget build(BuildContext context) {
+  final textScale = MediaQuery.of(context).textScaleFactor;
+
+  return Semantics(
+    container: true,
+    label: 'Tela de cadastro de usuário',
+    child: Scaffold(
+      appBar: AppBar(
+        title: Semantics(
+          label: 'Tela de cadastro',
+          child: const Text('Cadastro'),
         ),
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 500),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // 📝 Título com semântica
-                      Semantics(
-                        header: true,
-                        label: 'Crie sua conta - formulário de cadastro',
-                        child: Text(
-                          'Crie sua conta',
-                          style: TextStyle(
-                            fontSize: 28 * textScale,
-                            fontWeight: FontWeight.bold,
-                          ),
+        automaticallyImplyLeading: false,
+      ),
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 700),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Semantics(
+                      header: true,
+                      label: 'Crie sua conta - formulário de cadastro',
+                      child: Text(
+                        'Crie sua conta',
+                        style: TextStyle(
+                          fontSize: 28 * textScale,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      
-                      Semantics(
-                        label: 'Use um email válido e escolha uma senha segura para começar a controlar suas despesas em grupo.',
-                        child: Text(
+                    ),
+                    const SizedBox(height: 12),
+                    Semantics(
+                      label:
                           'Use um email válido e escolha uma senha segura para começar a controlar suas despesas em grupo.',
-                          style: TextStyle(
-                            fontSize: 16 * textScale,
-                          ),
+                      child: Text(
+                        'Use um email válido e escolha uma senha segura para começar a controlar suas despesas em grupo.',
+                        style: TextStyle(
+                          fontSize: 16 * textScale,
                         ),
                       ),
-                      const SizedBox(height: 32),
-                      
-                      // 👤 Campo Nome
-                      _buildNameField(textScale),
-                      const SizedBox(height: 16),
-                      
-                      // 📧 Campo Email
-                      _buildEmailField(textScale),
-                      const SizedBox(height: 16),
-                      
-                      // 🔒 Campo Senha
-                      _buildPasswordField(textScale),
-                      const SizedBox(height: 16),
-                      
-                      // 🔒 Campo Confirmar Senha
-                      _buildConfirmPasswordField(textScale),
-                      const SizedBox(height: 32),
-                      
-                      // 📱 Botão Cadastrar
-                      _buildRegisterButton(textScale),
-                      const SizedBox(height: 16),
-                      
-                      // 🔗 Botão Login
-                      _buildLoginButton(textScale),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 32),
+                    _buildNameField(textScale),
+                    const SizedBox(height: 16),
+                    _buildEmailField(textScale),
+                    const SizedBox(height: 16),
+                    _buildPasswordField(textScale),
+                    const SizedBox(height: 16),
+                    _buildConfirmPasswordField(textScale),
+                    const SizedBox(height: 32),
+                    _buildRegisterButton(textScale),
+                    const SizedBox(height: 16),
+                    _buildLoginButton(textScale),
+                  ],
                 ),
               ),
             ),
           ),
         ),
       ),
-    );
-  }
-
+    ),
+  );
+}
   // ============================================================
   // COMPONENTES ACESSÍVEIS
   // ============================================================

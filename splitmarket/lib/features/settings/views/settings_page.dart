@@ -26,9 +26,9 @@ class SettingsPage extends StatelessWidget {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Column(
           children: [
-            // ============================================
+            
             // Cabeçalho
-            // ============================================
+            
             Semantics(
               label: 'Cabeçalho - Configurações',
               child: Container(
@@ -92,9 +92,9 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
             
-            // ============================================
+            
             // Conteúdo
-            // ============================================
+            
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(24),
@@ -226,14 +226,14 @@ class SettingsPage extends StatelessWidget {
             ),
           ],
         ),
-        bottomNavigationBar: const CustomBottomNavbar(currentIndex: 3),
+        bottomNavigationBar: const CustomBottomNavbar(currentIndex: 4),
       ),
     );
   }
 
-  // ============================================================
+  
   // CARD DE CONFIGURAÇÃO ACESSÍVEL
-  // ============================================================
+  
   Widget _buildSettingsCard({
     required BuildContext context,
     required IconData icon,
@@ -327,9 +327,9 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  // ============================================================
+  
   // BOTÃO SAIR ACESSÍVEL
-  // ============================================================
+ 
   Widget _buildLogoutButton(BuildContext context, double textScale) {
     return Semantics(
       button: true,

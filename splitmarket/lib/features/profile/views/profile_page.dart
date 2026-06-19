@@ -1,14 +1,15 @@
 // lib/features/profile/views/profile_page.dart
+import 'dart:convert';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/preferences_service.dart';
 import '../../../data/models/user_model.dart';
-import '../../../data/repositories/expense_repository.dart';
 import '../../../data/repositories/group_repository.dart';
 import '../../../shared/widgets/custom_buttom_navbar.dart';
 
@@ -24,20 +25,22 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isLoading = true;
   bool _isEditing = false;
   String? _errorMessage;
-  
+  String? _photoBase64;
+
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  
+
   final AuthService _authService = AuthService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // 🎯 Focus nodes
+  // Focus nodes para acessibilidade
   final FocusNode _nameFocusNode = FocusNode();
   final FocusNode _saveButtonFocusNode = FocusNode();
   final FocusNode _cancelButtonFocusNode = FocusNode();
   final FocusNode _editButtonFocusNode = FocusNode();
   final FocusNode _logoutButtonFocusNode = FocusNode();
+  final FocusNode _backButtonFocusNode = FocusNode();
 
   @override
   void initState() {
@@ -54,29 +57,27 @@ class _ProfilePageState extends State<ProfilePage> {
     _cancelButtonFocusNode.dispose();
     _editButtonFocusNode.dispose();
     _logoutButtonFocusNode.dispose();
+    _backButtonFocusNode.dispose();
     super.dispose();
   }
 
-  // 🗣️ Método para anunciar ao TalkBack
   void _announceToTalkBack(String message) {
-    if (mounted) {
-      SemanticsService.announce(
-        message,
-        Directionality.of(context),
-      );
-    }
+    if (!mounted) return;
+    SemanticsService.announce(message, Directionality.of(context));
   }
 
   Future<void> _loadUserData() async {
+    if (!mounted) return;
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
-    
+
     try {
       final userId = _auth.currentUser?.uid;
       debugPrint('🟡 User ID atual: $userId');
-      
+
       if (userId == null) {
         debugPrint('❌ Usuário não está logado');
         if (mounted) {
@@ -84,7 +85,7 @@ class _ProfilePageState extends State<ProfilePage> {
         }
         return;
       }
-      
+
       debugPrint('🟡 Buscando documento do usuário no Firestore...');
       final doc = await _firestore
           .collection('users')
@@ -96,67 +97,75 @@ class _ProfilePageState extends State<ProfilePage> {
               throw Exception('Timeout ao conectar com Firestore');
             },
           );
-      
+
       debugPrint('📄 Documento existe? ${doc.exists}');
-      
+
       if (doc.exists) {
         debugPrint('✅ Dados encontrados: ${doc.data()}');
         _user = UserModel.fromMap(doc.id, doc.data()!);
+        _photoBase64 = doc.data()?['photoBase64'];
         _nameController.text = _user?.name ?? '';
         _emailController.text = _user?.email ?? '';
       } else {
         debugPrint('⚠️ Documento não existe. Criando novo...');
-        final user = _auth.currentUser;
-        if (user != null) {
+        final firebaseUser = _auth.currentUser;
+
+        if (firebaseUser != null) {
           final newUser = UserModel(
-            id: user.uid,
-            email: user.email ?? '',
-            name: user.email?.split('@')[0] ?? 'Usuário',
+            id: firebaseUser.uid,
+            email: firebaseUser.email ?? '',
+            name: firebaseUser.email?.split('@')[0] ?? 'Usuário',
             createdAt: DateTime.now(),
             lastLogin: DateTime.now(),
           );
-          
+
           await _firestore
               .collection('users')
-              .doc(user.uid)
+              .doc(firebaseUser.uid)
               .set(newUser.toMap());
-          
+
           _user = newUser;
-          _nameController.text = _user!.name;
-          _emailController.text = _user!.email;
+          _photoBase64 = null;
+          _nameController.text = newUser.name;
+          _emailController.text = newUser.email;
+
           debugPrint('✅ Usuário criado no Firestore');
         }
       }
     } on FirebaseException catch (e) {
       debugPrint('❌ FirebaseException: ${e.code} - ${e.message}');
       _errorMessage = 'Erro do Firebase: ${e.message}';
-      
-      _announceToTalkBack('Erro ao carregar perfil: ${e.message}');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Semantics(
-            label: 'Erro: ${e.message}',
-            child: Text('Erro: ${e.message}'),
+
+      if (mounted) {
+        _announceToTalkBack('Erro ao carregar perfil: ${e.message}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Semantics(
+              label: 'Erro: ${e.message}',
+              child: Text('Erro: ${e.message}'),
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+        );
+      }
     } catch (e) {
       debugPrint('❌ Erro geral: $e');
       _errorMessage = 'Erro ao carregar perfil: $e';
-      
-      _announceToTalkBack('Erro ao carregar perfil');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Semantics(
-            label: 'Erro ao carregar perfil: $e',
-            child: Text('Erro ao carregar perfil: $e'),
+
+      if (mounted) {
+        _announceToTalkBack('Erro ao carregar perfil');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Semantics(
+              label: 'Erro ao carregar perfil: $e',
+              child: Text('Erro ao carregar perfil: $e'),
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
           ),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
-      );
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -166,40 +175,47 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _saveProfile() async {
     if (_user == null) return;
-    
-    setState(() => _isLoading = true);
-    
-    try {
-      final newName = _nameController.text.trim();
-      
-      if (newName.isEmpty) {
-        _announceToTalkBack('Nome não pode estar vazio');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Semantics(
-              label: 'Nome não pode estar vazio',
-              child: const Text('Nome não pode estar vazio'),
-            ),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 3),
+
+    final newName = _nameController.text.trim();
+
+    if (newName.isEmpty) {
+      _announceToTalkBack('Nome não pode estar vazio');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Semantics(
+            label: 'Nome não pode estar vazio',
+            child: const Text('Nome não pode estar vazio'),
           ),
-        );
-        return;
-      }
-      
-      await _firestore
-          .collection('users')
-          .doc(_user!.id)
-          .update({
-            'name': newName,
-            'lastLogin': DateTime.now().toIso8601String(),
-          });
-      
-      _user = _user!.copyWith(name: newName, lastLogin: DateTime.now());
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final now = DateTime.now();
+
+      await _firestore.collection('users').doc(_user!.id).update({
+        'name': newName,
+        'lastLogin': now.toIso8601String(),
+      });
+
+      _user = _user!.copyWith(
+        name: newName,
+        lastLogin: now,
+      );
+
       await PreferencesService.saveUserName(newName);
-      
-      setState(() => _isEditing = false);
-      
+
+      if (!mounted) return;
+
+      setState(() {
+        _isEditing = false;
+      });
+
       _announceToTalkBack('Perfil atualizado com sucesso');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -213,6 +229,7 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     } catch (e) {
       if (!mounted) return;
+
       _announceToTalkBack('Erro ao salvar: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -300,24 +317,27 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       ),
     );
-    
-    if (confirm == true) {
-      _announceToTalkBack('Saindo da conta');
-      await _authService.signOut();
-      await PreferencesService.clearUserData();
-      
-      context.read<GroupProvider>().limparGrupos();
 
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-      }
+    if (confirm != true) return;
+
+    _announceToTalkBack('Saindo da conta');
+    await _authService.signOut();
+    await PreferencesService.clearUserData();
+
+    if (mounted) {
+      context.read<GroupProvider>().limparGrupos();
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
     }
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return '---';
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   @override
   Widget build(BuildContext context) {
     final textScale = MediaQuery.of(context).textScaleFactor;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Semantics(
       container: true,
@@ -326,9 +346,6 @@ class _ProfilePageState extends State<ProfilePage> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Column(
           children: [
-            // ============================================
-            // Cabeçalho
-            // ============================================
             Semantics(
               label: 'Cabeçalho - Meu Perfil',
               child: Container(
@@ -352,11 +369,15 @@ class _ProfilePageState extends State<ProfilePage> {
                       label: 'Voltar',
                       hint: 'Toque para voltar à tela anterior',
                       child: IconButton(
+                        focusNode: _backButtonFocusNode,
                         onPressed: () {
                           _announceToTalkBack('Voltando para tela anterior');
                           Navigator.pop(context);
                         },
-                        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -391,10 +412,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
             ),
-            
-            // ============================================
-            // Conteúdo
-            // ============================================
             Expanded(
               child: _isLoading
                   ? Center(
@@ -425,9 +442,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ============================================================
-  // WIDGET DE ERRO
-  // ============================================================
   Widget _buildErrorWidget(double textScale) {
     return Center(
       child: Semantics(
@@ -447,9 +461,7 @@ class _ProfilePageState extends State<ProfilePage> {
             Text(
               _errorMessage ?? 'Erro desconhecido',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16 * textScale,
-              ),
+              style: TextStyle(fontSize: 16 * textScale),
             ),
             const SizedBox(height: 24),
             Semantics(
@@ -467,9 +479,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 child: Text(
                   'Tentar novamente',
-                  style: TextStyle(
-                    fontSize: 16 * textScale,
-                  ),
+                  style: TextStyle(fontSize: 16 * textScale),
                 ),
               ),
             ),
@@ -479,22 +489,23 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ============================================================
-  // AVATAR
-  // ============================================================
   Widget _buildAvatar(double textScale) {
+    final hasPhoto = _photoBase64 != null && _photoBase64!.isNotEmpty;
+
     return Semantics(
-      label: 'Avatar do usuário',
+      label: hasPhoto ? 'Foto de perfil do usuário' : 'Avatar do usuário',
       child: Container(
         width: 120 * textScale,
         height: 120 * textScale,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF8E76F7), Color(0xFFB993F9)],
-          ),
+          gradient: hasPhoto
+              ? null
+              : const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF8E76F7), Color(0xFFB993F9)],
+                ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
@@ -504,17 +515,26 @@ class _ProfilePageState extends State<ProfilePage> {
           ],
         ),
         child: ClipOval(
-          child: _buildAvatarInitials(textScale),
+          child: hasPhoto
+              ? Image.memory(
+                  base64Decode(_photoBase64!),
+                  fit: BoxFit.cover,
+                  width: 120 * textScale,
+                  height: 120 * textScale,
+                  errorBuilder: (_, __, ___) {
+                    return _buildAvatarInitials(textScale);
+                  },
+                )
+              : _buildAvatarInitials(textScale),
         ),
       ),
     );
   }
 
   Widget _buildAvatarInitials(double textScale) {
-    final String initials = _user?.name.isNotEmpty == true
-        ? _user!.name[0].toUpperCase()
-        : '?';
-    
+    final String initials =
+        _user?.name.isNotEmpty == true ? _user!.name[0].toUpperCase() : '?';
+
     return Container(
       color: Colors.white.withOpacity(0.3),
       child: Center(
@@ -530,9 +550,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ============================================================
-  // CARD DE INFORMAÇÕES
-  // ============================================================
   Widget _buildInfoCard(double textScale) {
     return Semantics(
       container: true,
@@ -557,7 +574,10 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 ExcludeSemantics(
                   excluding: true,
-                  child: const Icon(Icons.person_outline, color: Color(0xFF8E76F7)),
+                  child: const Icon(
+                    Icons.person_outline,
+                    color: Color(0xFF8E76F7),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Semantics(
@@ -574,9 +594,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ],
             ),
             const Divider(height: 24),
-            
             if (_isEditing) ...[
-              // ✏️ Modo de edição
               Semantics(
                 textField: true,
                 label: 'Nome',
@@ -589,16 +607,10 @@ class _ProfilePageState extends State<ProfilePage> {
                     labelText: 'Nome',
                     prefixIcon: const Icon(Icons.person_outline),
                     border: const OutlineInputBorder(),
-                    labelStyle: TextStyle(
-                      fontSize: 16 * textScale,
-                    ),
-                    hintStyle: TextStyle(
-                      fontSize: 14 * textScale,
-                    ),
+                    labelStyle: TextStyle(fontSize: 16 * textScale),
+                    hintStyle: TextStyle(fontSize: 14 * textScale),
                   ),
-                  style: TextStyle(
-                    fontSize: 16 * textScale,
-                  ),
+                  style: TextStyle(fontSize: 16 * textScale),
                 ),
               ),
               const SizedBox(height: 16),
@@ -613,13 +625,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     labelText: 'Email',
                     prefixIcon: const Icon(Icons.email_outlined),
                     border: const OutlineInputBorder(),
-                    labelStyle: TextStyle(
-                      fontSize: 16 * textScale,
-                    ),
+                    labelStyle: TextStyle(fontSize: 16 * textScale),
                   ),
-                  style: TextStyle(
-                    fontSize: 16 * textScale,
-                  ),
+                  style: TextStyle(fontSize: 16 * textScale),
                 ),
               ),
               const SizedBox(height: 24),
@@ -665,9 +673,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         child: Text(
                           'Cancelar',
-                          style: TextStyle(
-                            fontSize: 16 * textScale,
-                          ),
+                          style: TextStyle(fontSize: 16 * textScale),
                         ),
                       ),
                     ),
@@ -675,7 +681,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
             ] else ...[
-              // 👤 Modo de visualização
               _buildInfoRow(
                 Icons.person_outline,
                 'Nome',
@@ -693,9 +698,7 @@ class _ProfilePageState extends State<ProfilePage> {
               _buildInfoRow(
                 Icons.calendar_today,
                 'Membro desde',
-                _user?.createdAt != null
-                    ? '${_user!.createdAt.day}/${_user!.createdAt.month}/${_user!.createdAt.year}'
-                    : '---',
+                _formatDate(_user?.createdAt),
                 textScale,
               ),
             ],
@@ -705,10 +708,12 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ============================================================
-  // LINHA DE INFORMAÇÃO
-  // ============================================================
-  Widget _buildInfoRow(IconData icon, String label, String value, double textScale) {
+  Widget _buildInfoRow(
+    IconData icon,
+    String label,
+    String value,
+    double textScale,
+  ) {
     return Row(
       children: [
         ExcludeSemantics(
@@ -743,9 +748,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ============================================================
-  // BOTÃO SAIR
-  // ============================================================
   Widget _buildLogoutButton(double textScale) {
     return Semantics(
       button: true,
